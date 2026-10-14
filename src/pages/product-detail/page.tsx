@@ -1,208 +1,208 @@
-import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronLeft, ShoppingBag, Star } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { BrandMark } from '@/components/brand/brand-mark'
 import { CloudinaryImage } from '@/components/media/cloudinary-image'
-import { Reveal } from '@/components/layout/reveal'
+import { EmptyState } from '@/components/ui/empty-state'
+import { CatalogDetailSkeleton } from '@/components/catalog/catalog-detail-skeleton'
+import { SectionHeading } from '@/components/layout/section-heading'
 import { Seo } from '@/components/layout/seo'
-import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog } from '@/components/ui/dialog'
-import { ErrorState } from '@/components/ui/error-state'
-import { Separator } from '@/components/ui/separator'
-import { ProductCard } from '@/components/catalog/product-card'
-import { getProductBySlug, products } from '@/entities/product/model/mock'
+import { queryKeys } from '@/shared/api/keys'
+import { fetchProductDetail } from '@/shared/api/catalog-repository'
+import { formatCurrency, formatDate, humanizeSlug } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { formatCurrency } from '@/shared/lib/format'
+import { useCartStore } from '@/shared/stores/cart-store'
+import { readProductContent } from '@/shared/lib/product-content'
+import { useLocale } from '@/shared/hooks/use-locale'
 
 export function Component() {
-  const { slug = '' } = useParams()
-  const [guideOpen, setGuideOpen] = useState(false)
+  const { slug = 'product' } = useParams()
+  const navigate = useNavigate()
+  const locale = useLocale()
+  const addItem = useCartStore((state) => state.addItem)
+  const productQuery = useQuery({
+    queryKey: [...queryKeys.pages.all, 'product-detail', slug] as const,
+    queryFn: () => fetchProductDetail(slug),
+  })
 
-  const product = getProductBySlug(slug)
+  if (productQuery.isLoading) {
+    return <CatalogDetailSkeleton kind="product" />
+  }
 
-  const recommendations = useMemo(
-    () => products.filter((item) => item.slug !== product?.slug).slice(0, 3),
-    [product?.slug],
-  )
-
-  if (!product) {
+  if (productQuery.error) {
     return (
-      <ErrorState
-        title="Product not found"
-        description="That item is not available in the current catalog."
-        actionLabel="Back to collections"
+      <EmptyState
+        title="Unable to load product"
+        description="Supabase could not load the product details."
+        actionLabel="Retry"
         onAction={() => {
-          window.location.href = routes.collections
+          void productQuery.refetch()
         }}
       />
     )
   }
 
+  if (!productQuery.data) {
+    return (
+      <EmptyState
+        title={humanizeSlug(slug)}
+        description="This product has not been published yet in Supabase."
+        actionLabel="Browse collections"
+        onAction={() => {
+          navigate(routes.forLocale(locale, 'collections'))
+        }}
+      />
+    )
+  }
+
+  const { product, category, collection, images, reviews, averageRating } = productQuery.data
+  const productName = readProductContent(product.metadata, 'name', locale) ?? humanizeSlug(product.slug)
+  const productDescription = readProductContent(product.metadata, 'description', locale)
+  const primaryImage = images.find((image) => image.isPrimary && image.media)
+    ?? images.find((image) => image.media)
+  const heroImage = primaryImage?.media?.secure_url ?? primaryImage?.media?.public_id ?? ''
+  const galleryImages = images.filter((image) => image.media)
+
   return (
-    <div className="space-y-16">
-      <Seo title={product.name} description={product.description} />
-      <Breadcrumb
-        items={[
-          { label: 'Collections', href: routes.collections },
-          { label: product.collection, href: routes.collections },
-          { label: product.name },
-        ]}
+    <div className="space-y-10">
+      <Seo
+        title={productName}
+        description={productDescription ?? product.material ?? product.dimensions ?? 'Premium product details from Supabase.'}
       />
 
-      <Reveal>
-        <section className="grid gap-8 lg:grid-cols-[1fr_0.95fr] lg:items-start">
-          <Card className="overflow-hidden p-0 shadow-[var(--shadow-elevated)]">
-            <CloudinaryImage
-              publicId={product.imageId}
-              alt={product.name}
-              className="h-full min-h-[34rem] w-full object-cover"
-              priority
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button asChild variant="ghost">
+          <Link to={routes.forLocale(locale, 'collections')}>
+            <ChevronLeft className="h-4 w-4" />
+            Back to collections
+          </Link>
+        </Button>
+        <div className="flex flex-wrap gap-2">
+          {category ? <Badge variant="outline">{category.slug}</Badge> : null}
+          {collection ? <Badge variant="premium">{collection.slug}</Badge> : null}
+          <Badge variant="outline">{product.stock_status}</Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+        <Card className="overflow-hidden shadow-[var(--shadow-elevated)]">
+          {heroImage ? (
+            <div className="aspect-[4/5]">
+              <CloudinaryImage
+                publicId={heroImage}
+                alt={productName}
+                className="h-full w-full object-cover"
+                priority
+              />
+            </div>
+          ) : (
+            <div className="grid aspect-[4/5] place-items-center bg-surface">
+              <BrandMark variant="stacked" />
+            </div>
+          )}
+        </Card>
+
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <SectionHeading
+              eyebrow={product.sku}
+              title={productName}
+              description={productDescription ?? product.material ?? product.dimensions ?? 'A premium product managed directly from Supabase.'}
             />
-          </Card>
-
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge variant="premium">{product.badge}</Badge>
-                <Badge variant="outline">{product.category}</Badge>
+            {averageRating != null ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Star className="h-4 w-4 fill-warning text-warning" />
+                <span>{averageRating.toFixed(1)} average rating</span>
+                <span>·</span>
+                <span>{reviews.length} approved review(s)</span>
               </div>
-              <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-                {product.name}
-              </h1>
-              <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-                {product.description}
-              </p>
-            </div>
+            ) : null}
+          </div>
 
-            <div className="flex items-end gap-3">
-              <p className="font-display text-4xl font-semibold text-foreground">
-                {formatCurrency(product.price)}
-              </p>
-              {product.compareAtPrice ? (
-                <p className="pb-1 text-sm text-muted-foreground line-through">
-                  {formatCurrency(product.compareAtPrice)}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button>Add to cart</Button>
-              <Button variant="outline">Save to wishlist</Button>
-              <Button variant="premium" onClick={() => setGuideOpen(true)}>
-                View ritual guide
-              </Button>
-            </div>
-
-            <Separator />
-
-            <Card>
-              <CardContent className="space-y-4 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                  Product details
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="font-medium text-foreground">Material</p>
-                    <p className="text-sm text-muted-foreground">{product.material}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Dimensions</p>
-                    <p className="text-sm text-muted-foreground">{product.dimensions}</p>
+          <Card className="shadow-[var(--shadow-soft)]">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Price</p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <p className="font-display text-3xl font-semibold tracking-tight">
+                      {formatCurrency(Number(product.base_price), product.currency)}
+                    </p>
+                    {product.compare_at_price != null ? (
+                      <p className="text-sm text-muted-foreground line-through">
+                        {formatCurrency(Number(product.compare_at_price), product.currency)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      </Reveal>
-
-      <Reveal>
-        <section className="grid gap-6 lg:grid-cols-2">
-          <Card className="shadow-[var(--shadow-soft)]">
-            <CardContent className="space-y-4 p-6">
-              <h2 className="font-display text-3xl font-semibold tracking-tight">
-                Highlights
-              </h2>
-              <div className="space-y-3">
-                {product.highlights.map((highlight) => (
-                  <div
-                    key={highlight}
-                    className="rounded-[var(--radius-field)] border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground"
-                  >
-                    {highlight}
-                  </div>
-                ))}
+                <Badge variant="premium">{product.stock_status}</Badge>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Material</p>
+                  <p className="mt-2 text-sm">{product.material ?? 'Not set'}</p>
+                </div>
+                <div className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Dimensions</p>
+                  <p className="mt-2 text-sm">{product.dimensions ?? 'Not set'}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                disabled={product.stock_status !== 'active'}
+                onClick={() => {
+                  addItem({
+                    productId: product.id,
+                    slug: product.slug,
+                    name: productName,
+                    price: Number(product.base_price),
+                    currency: product.currency,
+                    image: heroImage,
+                  })
+                  toast.success('Added to cart')
+                }}
+              >
+                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                Add to cart
+              </Button>
             </CardContent>
           </Card>
 
-          <Card className="shadow-[var(--shadow-soft)]">
-            <CardContent className="space-y-4 p-6">
-              <h2 className="font-display text-3xl font-semibold tracking-tight">
-                Care instructions
-              </h2>
-              <div className="space-y-3">
-                {product.care.map((step) => (
-                  <div
-                    key={step}
-                    className="rounded-[var(--radius-field)] border border-border bg-surface/70 px-4 py-3 text-sm leading-6 text-muted-foreground"
-                  >
-                    {step}
+          {galleryImages.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {galleryImages.map((image) => (
+                <Card key={image.id} className="overflow-hidden p-0 shadow-[var(--shadow-soft)]">
+                  <div className="aspect-square">
+                    <CloudinaryImage
+                      publicId={image.media?.secure_url ?? image.media?.public_id ?? ''}
+                      alt={image.altText ?? product.slug}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      </Reveal>
-
-      <Reveal>
-        <section className="space-y-8">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Recommended
-              </p>
-              <h2 className="font-display text-3xl font-semibold tracking-tight">
-                Similar pieces you may want to explore
-              </h2>
+                </Card>
+              ))}
             </div>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {recommendations.map((item) => (
-              <ProductCard
-                key={item.slug}
-                product={item}
-                href={routes.productDetail(item.slug)}
-              />
-            ))}
-          </div>
-        </section>
-      </Reveal>
+          ) : null}
 
-      <Dialog
-        open={guideOpen}
-        onOpenChange={setGuideOpen}
-        title="Ritual guide"
-        description="How to place, use, and care for this piece with intention."
-      >
-        <div className="space-y-4 text-sm leading-7 text-muted-foreground">
-          <p>
-            Begin by placing the product on a stable, clean surface with enough
-            breathing room around it.
-          </p>
-          <p>
-            Use the piece as part of a calm routine, then wipe it dry after use and
-            return it to a dry storage space.
-          </p>
-          <p>
-            Pair it with matching brass, marble, or cotton accessories for a fully
-            composed ritual setting.
-          </p>
+          <Card className="shadow-[var(--shadow-soft)]">
+            <CardContent className="space-y-3 p-6">
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Published</p>
+              <p className="font-display text-2xl font-semibold tracking-tight">
+                {formatDate(product.created_at)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Product and image data are loaded directly from Supabase, and image URLs can be managed from the admin panel.
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </Dialog>
+      </div>
     </div>
   )
 }

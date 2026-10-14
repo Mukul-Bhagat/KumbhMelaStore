@@ -1,46 +1,138 @@
+import { getActiveLocale } from '@/shared/lib/locale-state'
+import { buildLocalizedPath } from '@/shared/lib/locale'
+
+export type RoutePath = string
+
+function localized(pathname = '', locale = getActiveLocale()) {
+  return buildLocalizedPath(locale, pathname)
+}
+
 export const routes = {
-  home: '/',
-  collections: '/collections',
-  collectionDetail: (slug = ':slug') => `/collections/${slug}`,
-  categories: '/categories',
-  categoryDetail: (slug = ':slug') => `/categories/${slug}`,
-  productDetail: (slug = ':slug') => `/products/${slug}`,
-  cart: '/cart',
-  wishlist: '/wishlist',
-  checkout: '/checkout',
-  about: '/about',
-  contact: '/contact',
-  blog: '/blog',
-  trackOrder: '/track-order',
-  privacyPolicy: '/privacy-policy',
-  terms: '/terms',
-  refundPolicy: '/refund-policy',
-  shippingPolicy: '/shipping-policy',
+  get home() {
+    return localized('')
+  },
+  get collections() {
+    return localized('collections')
+  },
+  get products() {
+    return localized('products')
+  },
+  collectionDetail(slug = ':slug') {
+    return localized(`collections/${slug}`)
+  },
+  get categories() {
+    return localized('categories')
+  },
+  categoryDetail(slug = ':slug') {
+    return localized(`categories/${slug}`)
+  },
+  productDetail(slug = ':slug') {
+    return localized(`products/${slug}`)
+  },
+  product(slug = ':slug') {
+    return localized(`product/${slug}`)
+  },
+  get account() {
+    return localized('account')
+  },
+  get cart() {
+    return localized('cart')
+  },
+  get wishlist() {
+    return localized('wishlist')
+  },
+  get checkout() {
+    return localized('checkout')
+  },
+  get about() {
+    return localized('about')
+  },
+  get contact() {
+    return localized('contact')
+  },
+  get blog() {
+    return localized('blog')
+  },
+  get trackOrder() {
+    return localized('track-order')
+  },
+  get privacyPolicy() {
+    return localized('privacy-policy')
+  },
+  get terms() {
+    return localized('terms')
+  },
+  get refundPolicy() {
+    return localized('refund-policy')
+  },
+  get shippingPolicy() {
+    return localized('shipping-policy')
+  },
+  get faq() {
+    return localized('faq')
+  },
   auth: {
-    signIn: '/auth/sign-in',
-    signUp: '/auth/sign-up',
+    get signIn() {
+      return localized('auth/sign-in')
+    },
+    get signUp() {
+      return localized('auth/sign-up')
+    },
+    get forgotPassword() {
+      return localized('auth/forgot-password')
+    },
+    get resetPassword() {
+      return '/auth/reset-password'
+    },
+    get callback() {
+      return '/auth/callback'
+    },
+    get signOut() {
+      return localized('auth/sign-out')
+    },
   },
   dashboard: {
-    home: '/dashboard',
-    orders: '/dashboard/orders',
-    profile: '/dashboard/profile',
-    settings: '/dashboard/settings',
+    get home() {
+      return localized('dashboard')
+    },
+    get orders() {
+      return localized('dashboard/orders')
+    },
+    get profile() {
+      return localized('dashboard/profile')
+    },
+    get settings() {
+      return localized('dashboard/settings')
+    },
+    get addresses() {
+      return localized('dashboard/addresses')
+    },
   },
-  notFound: '*',
+  admin: {
+    get home() {
+      return localized('admin')
+    },
+    get content() {
+      return localized('admin/content')
+    },
+    get catalog() {
+      return localized('admin/catalog')
+    },
+    get orders() {
+      return localized('admin/orders')
+    },
+    get users() {
+      return localized('admin/users')
+    },
+    get settings() {
+      return localized('admin/settings')
+    },
+  },
+  neutral: {
+    authCallback: '/auth/callback',
+    authResetPassword: '/auth/reset-password',
+  },
+  forLocale(locale: 'hi' | 'en', pathname: string) {
+    return buildLocalizedPath(locale, pathname)
+  },
 } as const
-
-export type RoutePath =
-  | typeof routes.home
-  | typeof routes.collections
-  | typeof routes.categories
-  | typeof routes.cart
-  | typeof routes.wishlist
-  | typeof routes.checkout
-  | typeof routes.about
-  | typeof routes.contact
-  | typeof routes.blog
-  | typeof routes.trackOrder
-  | typeof routes.privacyPolicy
-  | typeof routes.terms
-  | typeof routes.refundPolicy
-  | typeof routes.shippingPolicy

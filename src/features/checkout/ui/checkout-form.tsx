@@ -1,79 +1,153 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreditCard, Mail, MapPinned, Phone, User } from 'lucide-react'
+import { Loader2, MapPinned, Phone, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { toast } from 'sonner'
 
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import { useAuth } from '@/shared/auth/provider'
+import { getSupabaseBrowserClient } from '@/shared/api/supabase'
 import {
   checkoutSchema,
   type CheckoutValues,
 } from '@/features/checkout/model/schema'
 
+const defaultValues: CheckoutValues = {
+  label: 'Home',
+  recipientName: '',
+  phone: '',
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  state: '',
+  postalCode: '',
+  countryCode: 'IN',
+  landmark: '',
+}
+
 export function CheckoutForm() {
+  const auth = useAuth()
+  const supabase = getSupabaseBrowserClient()
+  const [message, setMessage] = useState<string | null>(null)
+  const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('success')
+
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: {
-      fullName: '',
-      email: '',
-      phone: '',
+    defaultValues,
+  })
+
+  useEffect(() => {
+    form.reset({
+      label: 'Home',
+      recipientName: auth.profile?.displayName ?? auth.profile?.fullName ?? '',
+      phone: auth.profile?.phone ?? '',
       addressLine1: '',
       addressLine2: '',
       city: '',
       state: '',
       postalCode: '',
-      paymentMethod: 'card',
-      notes: '',
-    },
-  })
+      countryCode: 'IN',
+      landmark: '',
+    })
+  }, [auth.profile, auth.user?.email, form])
 
-  const onSubmit = form.handleSubmit(() => {
-    toast.success('Checkout details saved.')
+  const onSubmit = form.handleSubmit(async (values) => {
+    setMessage(null)
+
+    try {
+      if (!auth.user) {
+        throw new Error('You must be signed in to save an address.')
+      }
+
+      const { data: existingAddress, error: existingAddressError } = await supabase
+        .from('addresses')
+        .select('id')
+        .eq('user_id', auth.user.id)
+        .eq('is_default', true)
+        .maybeSingle()
+
+      if (existingAddressError) {
+        throw existingAddressError
+      }
+
+      const addressRecord = {
+        user_id: auth.user.id,
+        label: values.label,
+        recipient_name: values.recipientName,
+        phone: values.phone,
+        line1: values.addressLine1,
+        line2: values.addressLine2 || null,
+        city: values.city,
+        state: values.state,
+        postal_code: values.postalCode,
+        country_code: values.countryCode,
+        landmark: values.landmark || null,
+        is_default: true,
+      }
+
+      const mutation = existingAddress?.id
+        ? supabase.from('addresses').update(addressRecord).eq('id', existingAddress.id)
+        : supabase.from('addresses').insert(addressRecord)
+
+      const { error } = await mutation
+
+      if (error) {
+        throw error
+      }
+
+      setMessageVariant('success')
+      setMessage('Delivery address saved to Supabase. Your order foundation is ready.')
+    } catch (error) {
+      setMessageVariant('error')
+      setMessage(error instanceof Error ? error.message : 'Unable to save checkout details.')
+    }
   })
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      <Alert
+        title="Authenticated account"
+        description={`Checkout is saving address details for ${auth.user?.email ?? 'your account'}.`}
+      />
+
+      {message ? (
+        <Alert
+          title={messageVariant === 'success' ? 'Address saved' : 'Unable to save address'}
+          description={message}
+          variant={messageVariant === 'success' ? 'success' : 'error'}
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="checkout-name">Full name</Label>
+          <Label htmlFor="checkout-label">Address label</Label>
+          <Input id="checkout-label" {...form.register('label')} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="checkout-country">Country</Label>
+          <Select id="checkout-country" {...form.register('countryCode')}>
+            <option value="IN">India</option>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="checkout-name">Recipient name</Label>
           <div className="relative">
             <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="checkout-name"
               className="pl-11"
               placeholder="Mukul Sharma"
-              {...form.register('fullName')}
+              {...form.register('recipientName')}
             />
           </div>
-          {form.formState.errors.fullName ? (
-            <p className="text-xs text-error">
-              {form.formState.errors.fullName.message}
-            </p>
-          ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="checkout-email">Email</Label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="checkout-email"
-              type="email"
-              className="pl-11"
-              placeholder="name@example.com"
-              {...form.register('email')}
-            />
-          </div>
-          {form.formState.errors.email ? (
-            <p className="text-xs text-error">{form.formState.errors.email.message}</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="checkout-phone">Phone</Label>
           <div className="relative">
@@ -85,25 +159,6 @@ export function CheckoutForm() {
               placeholder="+91 98765 43210"
               {...form.register('phone')}
             />
-          </div>
-          {form.formState.errors.phone ? (
-            <p className="text-xs text-error">{form.formState.errors.phone.message}</p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="checkout-payment">Payment method</Label>
-          <div className="relative">
-            <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Select
-              id="checkout-payment"
-              className="pl-11"
-              {...form.register('paymentMethod')}
-            >
-              <option value="card">Card</option>
-              <option value="upi">UPI</option>
-              <option value="cod">Cash on Delivery</option>
-            </Select>
           </div>
         </div>
       </div>
@@ -119,18 +174,22 @@ export function CheckoutForm() {
             {...form.register('addressLine1')}
           />
         </div>
-        {form.formState.errors.addressLine1 ? (
-          <p className="text-xs text-error">
-            {form.formState.errors.addressLine1.message}
-          </p>
-        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="checkout-landmark">Landmark</Label>
+        <Input
+          id="checkout-landmark"
+          placeholder="Near the temple entrance"
+          {...form.register('landmark')}
+        />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="checkout-address-2">Address line 2</Label>
         <Input
           id="checkout-address-2"
-          placeholder="Landmark, locality, or building name"
+          placeholder="Locality, building, or flat number"
           {...form.register('addressLine2')}
         />
       </div>
@@ -138,34 +197,31 @@ export function CheckoutForm() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="checkout-city">City</Label>
-          <Input id="checkout-city" placeholder="Jaipur" {...form.register('city')} />
+          <Input id="checkout-city" placeholder="Prayagraj" {...form.register('city')} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="checkout-state">State</Label>
-          <Input id="checkout-state" placeholder="Rajasthan" {...form.register('state')} />
+          <Input id="checkout-state" placeholder="Uttar Pradesh" {...form.register('state')} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="checkout-postal">Postal code</Label>
           <Input
             id="checkout-postal"
-            placeholder="302001"
+            placeholder="211001"
             {...form.register('postalCode')}
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="checkout-notes">Delivery notes</Label>
-        <Textarea
-          id="checkout-notes"
-          rows={4}
-          placeholder="Gate code, preferred delivery window, or gifting note."
-          {...form.register('notes')}
-        />
-      </div>
-
-      <Button type="submit" className="w-full sm:w-auto">
-        Continue to payment
+      <Button type="submit" className="w-full sm:w-auto" disabled={form.formState.isSubmitting}>
+        {form.formState.isSubmitting ? (
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Saving
+          </span>
+        ) : (
+          'Save address'
+        )}
       </Button>
     </form>
   )

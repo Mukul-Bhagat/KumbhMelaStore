@@ -1,16 +1,18 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { defaultLocale, type Locale } from '@/shared/config/locales'
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 interface UiState {
   theme: ThemeMode
-  locale: string
+  locale: Locale
   currency: string
   mobileNavOpen: boolean
   searchOpen: boolean
   setTheme: (theme: ThemeMode) => void
-  setLocale: (locale: string) => void
+  setLocale: (locale: Locale) => void
   setCurrency: (currency: string) => void
   setMobileNavOpen: (open: boolean) => void
   toggleMobileNav: () => void
@@ -21,7 +23,7 @@ export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       theme: 'light',
-      locale: 'en-IN',
+      locale: defaultLocale,
       currency: 'INR',
       mobileNavOpen: false,
       searchOpen: false,

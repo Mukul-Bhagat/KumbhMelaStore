@@ -36,3 +36,16 @@ export function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '')
 }
+
+export function humanizeSlug(value: string) {
+  return (
+    value
+      .replace(/^\/+|\/+$/g, '')
+      .split('/')
+      .pop()
+      ?.split(/[-_]+/)
+      .filter(Boolean)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ') ?? value
+  )
+}

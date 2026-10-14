@@ -1,136 +1,124 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 
-import { Reveal } from '@/components/layout/reveal'
-import { Seo } from '@/components/layout/seo'
 import { SectionHeading } from '@/components/layout/section-heading'
-import { Badge } from '@/components/ui/badge'
+import { Seo } from '@/components/layout/seo'
+import { LoadingScreen } from '@/components/layout/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Avatar } from '@/components/ui/avatar'
-import {
-  dashboardOrders,
-  dashboardStats,
-  profile,
-  savedAddresses,
-} from '@/shared/data/site-content'
+import { EmptyState } from '@/components/ui/empty-state'
+import { queryKeys } from '@/shared/api/keys'
+import { getSupabaseBrowserClient } from '@/shared/api/supabase'
+import { useAuth } from '@/shared/auth/provider'
 import { routes } from '@/shared/config/routes'
-import { formatCurrency, formatDate } from '@/shared/lib/format'
+import { useLocale } from '@/shared/hooks/use-locale'
+import { useTranslate } from '@/shared/cms/hooks'
+import { formatCurrency } from '@/shared/lib/format'
+
+type OverviewData = {
+  latestOrderTotal: number | null
+  latestOrderStatus: string | null
+  latestOrderNumber: string | null
+  latestOrderCreatedAt: string | null
+}
+
+async function fetchOverviewData(userId: string): Promise<OverviewData> {
+  const supabase = getSupabaseBrowserClient()
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('order_number, grand_total, status, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return {
+    latestOrderTotal: data?.grand_total ?? null,
+    latestOrderStatus: data?.status ?? null,
+    latestOrderNumber: data?.order_number ?? null,
+    latestOrderCreatedAt: data?.created_at ?? null,
+  }
+}
 
 export function Component() {
-  const latestOrder = dashboardOrders[0]
+  const auth = useAuth()
+  const locale = useLocale()
+  const { t } = useTranslate()
+  const profile = auth.profile
+  const userId = auth.user?.id ?? ''
+  const overview = useQuery({
+    queryKey: queryKeys.dashboard.detail(userId),
+    queryFn: () => fetchOverviewData(userId),
+    enabled: Boolean(userId),
+  })
+
+  if (overview.isLoading) {
+    return <LoadingScreen className="min-h-[60svh]" />
+  }
+
+  if (overview.error) {
+    return (
+      <EmptyState
+        title={t('dashboard.load_error', 'Unable to load dashboard')}
+        description={t('dashboard.load_error_description', 'Supabase could not load the current account summary.')}
+        actionLabel={t('dashboard.retry', 'Retry')}
+        onAction={() => {
+          void overview.refetch()
+        }}
+      />
+    )
+  }
 
   return (
-    <div className="space-y-16">
-      <Seo title="Dashboard" description="Your KumbhMelaStore account overview." />
+    <div className="space-y-8">
+      <Seo
+        title={t('dashboard.overview', 'Dashboard')}
+        description={t('dashboard.seo_description', 'Your customer account dashboard powered by Supabase.')}
+      />
+      <SectionHeading
+        eyebrow={t('dashboard.label', 'Dashboard')}
+        title={`${t('dashboard.welcome', 'Welcome back')}, ${profile?.displayName ?? profile?.fullName ?? auth.user?.email ?? t('role.customer', 'Customer')}`}
+      />
 
-      <Reveal>
-        <section className="space-y-5">
-          <Badge variant="premium">Account overview</Badge>
-          <div className="space-y-4">
-            <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-              A calm account space for orders, addresses, and favorites.
-            </h1>
-            <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              The dashboard balances editorial spacing with direct access to the
-              customer’s most important account actions.
-            </p>
-          </div>
-        </section>
-      </Reveal>
-
-      <Reveal>
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {dashboardStats.map((stat) => (
-            <Card key={stat.label} className="shadow-[var(--shadow-soft)]">
-              <CardContent className="space-y-1 p-5">
-                <p className="font-display text-3xl font-semibold">{stat.value}</p>
-                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                  {stat.label}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-      </Reveal>
-
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <Reveal>
-          <Card className="shadow-[var(--shadow-elevated)]">
-            <CardContent className="space-y-6 p-6 sm:p-8">
-              <SectionHeading
-                eyebrow="Latest order"
-                title={latestOrder?.number ?? '#KM-00000'}
-                description={`Placed on ${formatDate(latestOrder?.date ?? new Date())} and currently ${(latestOrder?.status ?? 'Placed').toLowerCase()}.`}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[var(--radius-field)] border border-border bg-background p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                    Total
-                  </p>
-                  <p className="mt-2 font-display text-3xl font-semibold">
-                    {formatCurrency(latestOrder?.total ?? 0)}
-                  </p>
-                </div>
-                <div className="rounded-[var(--radius-field)] border border-border bg-background p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                    Payment
-                  </p>
-                  <p className="mt-2 font-display text-3xl font-semibold">
-                    {latestOrder?.payment ?? 'Prepaid'}
-                  </p>
-                </div>
-              </div>
-              <Button asChild>
-                <Link to={routes.dashboard.orders}>View all orders</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </Reveal>
-
-        <Reveal delay={0.08}>
-          <div className="space-y-6">
-            <Card className="shadow-[var(--shadow-soft)]">
-              <CardContent className="space-y-4 p-6">
-                <div className="flex items-center gap-3">
-                  <Avatar fallback={profile.avatarInitials} size="lg" />
-                  <div>
-                    <p className="font-medium text-foreground">{profile.name}</p>
-                    <p className="text-sm text-muted-foreground">{profile.tier}</p>
-                  </div>
-                </div>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>{profile.email}</p>
-                  <p>{profile.location}</p>
-                </div>
-                <Button asChild variant="outline" className="w-full">
-                  <Link to={routes.dashboard.profile}>Edit profile</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-[var(--shadow-soft)]">
-              <CardContent className="space-y-4 p-6">
-                <h2 className="font-display text-3xl font-semibold tracking-tight">
-                  Saved addresses
-                </h2>
-                <div className="space-y-3">
-                  {savedAddresses.map((address) => (
-                    <div
-                      key={address.label}
-                      className="rounded-[var(--radius-field)] border border-border bg-surface/70 p-4"
-                    >
-                      <p className="font-medium text-foreground">{address.label}</p>
-                      <p className="text-sm leading-6 text-muted-foreground">
-                        {address.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </Reveal>
-      </section>
+      {overview.data?.latestOrderNumber ? (
+        <Card className="shadow-[var(--shadow-soft)]">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h2 className="font-display text-xl font-semibold tracking-tight">{t('dashboard.recent_order', 'Recent order')}</h2>
+              <p className="text-sm text-muted-foreground">
+                {overview.data.latestOrderNumber}
+                {overview.data.latestOrderStatus
+                  ? ` · ${t(`dashboard.order_status.${overview.data.latestOrderStatus}`, overview.data.latestOrderStatus.replaceAll('_', ' '))}`
+                  : ''}
+                {overview.data.latestOrderCreatedAt
+                  ? ` · ${new Date(overview.data.latestOrderCreatedAt).toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-IN')}`
+                  : ''}
+                {overview.data.latestOrderTotal != null
+                  ? ` · ${formatCurrency(overview.data.latestOrderTotal)}`
+                  : ''}
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link to={routes.forLocale(locale, 'dashboard/orders')}>{t('dashboard.view_orders', 'View all orders')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          title={t('dashboard.no_orders', 'No orders yet')}
+          description={t('dashboard.explore_collection', 'Explore the collection and your orders will appear here.')}
+          action={
+            <Button asChild>
+              <Link to={routes.forLocale(locale, 'products')}>{t('dashboard.browse_products', 'Browse products')}</Link>
+            </Button>
+          }
+        />
+      )}
     </div>
   )
 }

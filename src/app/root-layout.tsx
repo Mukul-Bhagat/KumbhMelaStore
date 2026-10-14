@@ -1,9 +1,8 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from 'framer-motion'
 import { Outlet, useLocation, useNavigation } from 'react-router-dom'
 import { useEffect } from 'react'
 
 import { SkipLink } from '@/components/layout/skip-link'
-import { LoadingScreen } from '@/components/layout/loading-screen'
 
 export function RootLayout() {
   const location = useLocation()
@@ -18,21 +17,15 @@ export function RootLayout() {
     <div className="relative min-h-screen">
       <SkipLink />
       {navigation.state !== 'idle' ? (
-        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-xl">
-          <LoadingScreen className="h-full min-h-screen" />
+        <div
+          aria-label="Loading page"
+          aria-live="polite"
+          className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-primary/20"
+        >
+          <div className="h-full w-full animate-pulse bg-primary" />
         </div>
       ) : null}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={location.pathname}
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -12 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: 'easeOut' }}
-        >
-          <Outlet />
-        </motion.div>
-      </AnimatePresence>
+      <Outlet />
     </div>
   )
 }

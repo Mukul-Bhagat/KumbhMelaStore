@@ -1,108 +1,164 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Mail, MapPinned, Phone, User } from 'lucide-react'
+import { Loader2, Mail, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { toast } from 'sonner'
 
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import {
-  profileSchema,
-  type ProfileValues,
-} from '@/features/profile/model/schema'
+import { useAuth } from '@/shared/auth/provider'
+import { useTranslate } from '@/shared/cms/hooks'
+import { getSupabaseBrowserClient } from '@/shared/api/supabase'
+import { profileSchema, type ProfileValues } from '@/features/profile/model/schema'
+
+const defaultValues: ProfileValues = {
+  fullName: '',
+  displayName: '',
+  email: '',
+  phone: '',
+  locale: 'hi',
+  avatarUrl: '',
+}
 
 export function ProfileForm() {
+  const auth = useAuth()
+  const { t } = useTranslate()
+  const supabase = getSupabaseBrowserClient()
+  const [message, setMessage] = useState<string | null>(null)
+  const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('success')
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      fullName: 'Mukul Sharma',
-      email: 'mukul@example.com',
-      phone: '+91 98765 43210',
-      location: 'Jaipur, India',
-      preferredCurrency: 'INR',
-      newsletterOptIn: true,
-    },
+    defaultValues,
   })
 
-  const onSubmit = form.handleSubmit(() => {
-    toast.success('Profile settings saved.')
+  useEffect(() => {
+    form.reset({
+      fullName: auth.profile?.fullName ?? '',
+      displayName: auth.profile?.displayName ?? '',
+      email: auth.user?.email ?? '',
+      phone: auth.profile?.phone ?? '',
+      locale: auth.profile?.localeCode ?? 'hi',
+      avatarUrl: auth.profile?.avatarUrl ?? '',
+    })
+  }, [auth.profile, auth.user?.email, form])
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    setMessage(null)
+
+    try {
+      if (!auth.user) {
+        throw new Error(t('dashboard.profile_signed_in_required', 'You must be signed in to update your profile.'))
+      }
+
+      const payload = {
+        id: auth.user.id,
+        full_name: values.fullName,
+        display_name: values.displayName,
+        phone: values.phone,
+        locale_code: values.locale,
+        avatar_url: values.avatarUrl || null,
+      }
+
+      const { error: profileError } = await supabase.from('profiles').upsert(payload)
+      if (profileError) {
+        throw profileError
+      }
+
+      const { error: authError } = await supabase.auth.updateUser({
+        email: values.email,
+        data: {
+          full_name: values.fullName,
+          display_name: values.displayName,
+          phone: values.phone,
+          locale: values.locale,
+          avatar_url: values.avatarUrl || null,
+        },
+      })
+      if (authError) {
+        throw authError
+      }
+
+      await auth.refresh()
+      setMessageVariant('success')
+      setMessage(t('dashboard.profile_saved_description', 'Profile saved and synced with Supabase Auth.'))
+    } catch (error) {
+      setMessageVariant('error')
+      setMessage(error instanceof Error ? error.message : t('dashboard.profile_update_failed', 'Unable to save profile.'))
+    }
   })
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      {message ? (
+        <Alert
+          title={
+            messageVariant === 'success'
+              ? t('dashboard.profile_saved', 'Profile updated')
+              : t('dashboard.profile_save_failed', 'Profile update failed')
+          }
+          description={message}
+          variant={messageVariant === 'success' ? 'success' : 'error'}
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="profile-name">Full name</Label>
+          <Label htmlFor="profile-name">{t('dashboard.full_name', 'Full name')}</Label>
           <div className="relative">
             <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="profile-name"
-              className="pl-11"
-              {...form.register('fullName')}
-            />
+            <Input id="profile-name" className="pl-11" {...form.register('fullName')} />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="profile-email">Email</Label>
+          <Label htmlFor="profile-display-name">{t('dashboard.display_name', 'Display name')}</Label>
+          <Input id="profile-display-name" {...form.register('displayName')} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="profile-email">{t('dashboard.email', 'Email')}</Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="profile-email"
-              type="email"
-              className="pl-11"
-              {...form.register('email')}
-            />
+            <Input id="profile-email" type="email" className="pl-11" {...form.register('email')} />
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="profile-phone">{t('dashboard.phone', 'Phone')}</Label>
+          <Input id="profile-phone" type="tel" {...form.register('phone')} />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="profile-phone">Phone</Label>
-          <div className="relative">
-            <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="profile-phone"
-              type="tel"
-              className="pl-11"
-              {...form.register('phone')}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="profile-location">Location</Label>
-          <div className="relative">
-            <MapPinned className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="profile-location"
-              className="pl-11"
-              {...form.register('location')}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="profile-currency">Preferred currency</Label>
-          <Select id="profile-currency" {...form.register('preferredCurrency')}>
-            <option value="INR">INR</option>
-            <option value="USD">USD</option>
+          <Label htmlFor="profile-locale">{t('dashboard.preferred_language', 'Preferred language')}</Label>
+          <Select id="profile-locale" {...form.register('locale')}>
+            <option value="hi">{t('dashboard.language.hi', 'Hindi')}</option>
+            <option value="en">{t('dashboard.language.en', 'English')}</option>
           </Select>
         </div>
-        <label className="flex h-full items-center gap-3 rounded-[var(--radius-field)] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            {...form.register('newsletterOptIn')}
+        <div className="space-y-2">
+          <Label htmlFor="profile-avatar">{t('dashboard.avatar_url', 'Avatar URL')}</Label>
+          <Input
+            id="profile-avatar"
+            type="url"
+            placeholder="https://res.cloudinary.com/..."
+            {...form.register('avatarUrl')}
           />
-          Keep me subscribed to editorial and gifting updates
-        </label>
+        </div>
       </div>
 
-      <Button type="submit" className="w-full sm:w-auto">
-        Save changes
+      <Button type="submit" className="w-full sm:w-auto" disabled={form.formState.isSubmitting}>
+        {form.formState.isSubmitting ? (
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t('dashboard.saving', 'Saving')}
+          </span>
+        ) : (
+          t('dashboard.save_changes', 'Save changes')
+        )}
       </Button>
     </form>
   )

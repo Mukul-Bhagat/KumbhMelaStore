@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 
 import { site } from '@/shared/config/site'
 import { updateDocumentMeta } from '@/shared/lib/seo'
+import { useLocale } from '@/shared/hooks/use-locale'
 
 export interface SeoProps {
   title?: string
@@ -20,9 +21,10 @@ export function Seo({
   pathname,
 }: SeoProps) {
   const location = useLocation()
+  const locale = useLocale()
 
   useEffect(() => {
-    updateDocumentMeta(title, description, pathname ?? location.pathname)
+    updateDocumentMeta(title, description, pathname ?? location.pathname, locale)
 
     const robotsId = 'robots-meta'
     let robots = document.head.querySelector<HTMLMetaElement>(
@@ -58,7 +60,7 @@ export function Seo({
         document.head.appendChild(twitterImage)
       }
     }
-  }, [description, image, location.pathname, noIndex, pathname, title])
+  }, [description, image, location.pathname, locale, noIndex, pathname, title])
 
   return null
 }

@@ -90,11 +90,11 @@ export function Dialog({
       <div className="flex min-h-full items-center justify-center">
         <div
           className={cn(
-            'relative w-full overflow-hidden rounded-[var(--radius-card)] border border-border bg-card shadow-[var(--shadow-elevated)]',
+            'relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-card shadow-[var(--shadow-elevated)]',
             dialogSizes[size],
           )}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-5">
             <div>
               <h2 className="font-display text-2xl font-semibold tracking-tight">
                 {title}
@@ -115,9 +115,9 @@ export function Dialog({
               <X className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
-          <div className="px-6 py-5">{children}</div>
+          <div className="min-h-0 overflow-y-auto px-6 py-5">{children}</div>
           {footer ? (
-            <div className="border-t border-border px-6 py-4">{footer}</div>
+            <div className="shrink-0 border-t border-border px-6 py-4">{footer}</div>
           ) : null}
         </div>
       </div>

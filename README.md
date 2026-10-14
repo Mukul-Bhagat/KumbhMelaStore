@@ -1,75 +1,54 @@
-# React + TypeScript + Vite
+# KumbhMelaStore Foundation
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Production foundation for the KumbhMelaStore ecommerce platform built with React 19, Vite, TypeScript, Tailwind CSS v4, React Router, TanStack Query, Zustand, Framer Motion, shadcn/ui, Supabase, and Cloudinary.
 
-Currently, two official plugins are available:
+## Local Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Copy [.env.example](./.env.example) to `.env`.
+2. Fill in your Supabase project URL and publishable key.
+3. Set `VITE_CLOUDINARY_CLOUD_NAME` to your Cloudinary cloud name. For browser uploads, create an unsigned Cloudinary upload preset restricted to image formats and size, then set its name in `VITE_CLOUDINARY_UPLOAD_PRESET`. Never put the Cloudinary API secret in frontend environment variables.
+4. If you want local Supabase auth provider testing, set the optional provider secrets in `.env` and enable the provider blocks in [supabase/config.toml](./supabase/config.toml).
 
-## React Compiler
+`VITE_SUPABASE_URL` must be the reachable URL for the intended project; do not substitute a guessed project reference. The included `supabase/seed.sql` is applied by the local `supabase db reset` workflow below and does not provision users in a hosted project. Hosted Super Admin access must be provisioned for that project through a trusted administrative workflow.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Supabase Database
 
-## Expanding the ESLint configuration
+The database foundation lives in:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- [supabase/migrations/20260703_000001_initial_foundation.sql](./supabase/migrations/20260703_000001_initial_foundation.sql)
+- [supabase/seed.sql](./supabase/seed.sql)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Hosted Super Admin provisioning
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+The seed does not create Auth users. For the hosted project:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. In Supabase Dashboard → Authentication → Users, check for the exact account `kumbhmelamukul@kumbhmelastore.in` before provisioning anything. Do not use the separate normal-user account.
+2. If it is missing, invite that exact address through the dashboard and complete its email confirmation. If it already exists but cannot sign in, use the dashboard's password reset/invite flow rather than creating another account.
+3. Run [supabase/grant-super-admin.sql](./supabase/grant-super-admin.sql) in that project's SQL Editor. It grants the role only to the existing exact-email Auth account, does not create users, and reports account, confirmation, profile, and role status.
+4. Test sign-in for that account, then separately create a test product from the admin catalog and verify that it appears in the database/catalog.
 
+The SQL script requires the database migration and seeded `super_admin` role to exist. Do not add role assignment to frontend signup or expose a service-role key in the app.
+
+Typical local workflow:
+
+```bash
+supabase start
+supabase db reset
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `pnpm dev`
+- `pnpm build`
+- `pnpm lint`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Notes
 
-```
+- English is the default locale; valid saved language preferences and explicit `/hi` routes are preserved.
+- Hindi remains available through the language switch.
+- Admin product galleries accept HTTPS image URLs or direct browser uploads to Cloudinary. Uploads require a restricted unsigned preset; image metadata and product links are saved in Supabase.
+- The Super Admin console uses Supabase-backed managers for orders and their tracking history, profiles and non-Super-Admin role assignments, CMS pages/sections/translations/blogs/FAQs/policies/announcements, site settings, languages, navigation, and footer links.
+- Admin data writes continue to rely on the existing `is_super_admin()` RLS policies. The Users screen does not create or delete Auth accounts, display other users' private Auth emails, change email confirmation, or grant `super_admin`; use the guarded provisioning workflow above for Super Admin access.
+- Profile status is application profile metadata and does not disable Supabase Auth sign-in. Orders are protected with RLS, and public tracking uses the restricted RPC projection only.
+- CMS managers edit existing routed pages; route slugs and templates are fixed in the page editor to avoid creating database pages that the client router cannot serve.

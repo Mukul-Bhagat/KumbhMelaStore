@@ -3,9 +3,9 @@ import * as React from 'react'
 import { cn } from '@/shared/lib/cn'
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
-  src?: string
-  alt?: string
-  fallback?: string
+  src?: string | undefined
+  alt?: string | undefined
+  fallback?: string | undefined
   size?: 'sm' | 'md' | 'lg'
 }
 

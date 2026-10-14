@@ -1,19 +1,82 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
-import { type RoutePath } from '@/shared/config/routes'
-import type { NavigationLink } from '@/shared/config/site'
+import { cn } from '@/shared/lib/cn'
+import { isExternalHref } from '@/shared/lib/navigation'
+
+export interface MobileNavItem {
+  label: ReactNode
+  href?: string
+  onClick?: () => void
+  external?: boolean
+  variant?: 'default' | 'outline' | 'ghost'
+}
 
 export interface MobileNavProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  title: string
-  description?: string
-  primaryLinks: readonly NavigationLink[]
-  secondaryLinks?: readonly NavigationLink[]
-  actions?: readonly { label: string; href: RoutePath | string }[]
+  title: ReactNode
+  description?: ReactNode
+  primaryLinks: readonly MobileNavItem[]
+  secondaryLinks?: readonly MobileNavItem[]
+  actions?: readonly MobileNavItem[]
+}
+
+function renderItem(item: MobileNavItem, onClose: () => void) {
+  const external = item.external ?? (item.href ? isExternalHref(item.href) : false)
+  const variant = item.variant ?? 'outline'
+
+  if (item.onClick) {
+    return (
+      <Button
+        key={String(item.label)}
+        type="button"
+        variant={variant}
+        className="w-full justify-between"
+        onClick={() => {
+          item.onClick?.()
+          onClose()
+        }}
+      >
+        {item.label}
+      </Button>
+    )
+  }
+
+  if (!item.href) {
+    return null
+  }
+
+  const content = (
+    <span className="flex w-full items-center justify-between">
+      <span>{item.label}</span>
+      <span className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+        {external ? 'Open' : 'Go'}
+      </span>
+    </span>
+  )
+
+  return (
+    <Button
+      key={String(item.label)}
+      asChild
+      variant={variant}
+      className={cn('w-full justify-between', variant === 'ghost' && 'px-0')}
+    >
+      {external ? (
+        <a href={item.href} target="_blank" rel="noreferrer" onClick={onClose}>
+          {content}
+        </a>
+      ) : (
+        <Link to={item.href} onClick={onClose}>
+          {content}
+        </Link>
+      )}
+    </Button>
+  )
 }
 
 export function MobileNav({
@@ -36,38 +99,20 @@ export function MobileNav({
     >
       <div className="space-y-8">
         <nav className="space-y-2" aria-label="Primary">
-          {primaryLinks.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              onClick={() => onOpenChange(false)}
-              className="flex items-center justify-between rounded-[var(--radius-field)] border border-border bg-background px-4 py-3 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-muted"
-            >
-              <span>{item.label}</span>
-              <span className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Explore
-              </span>
-            </Link>
-          ))}
+          {primaryLinks.map((item) => {
+            const rendered = renderItem(item, () => onOpenChange(false))
+            return rendered ? <div key={String(item.label)}>{rendered}</div> : null
+          })}
         </nav>
 
         {secondaryLinks?.length ? (
           <>
             <Separator />
             <nav className="space-y-2" aria-label="Secondary">
-              {secondaryLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={() => onOpenChange(false)}
-                  className="flex items-center justify-between rounded-[var(--radius-field)] border border-border bg-surface px-4 py-3 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-background"
-                >
-                  <span>{item.label}</span>
-                  <span className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                    Go
-                  </span>
-                </Link>
-              ))}
+              {secondaryLinks.map((item) => {
+                const rendered = renderItem(item, () => onOpenChange(false))
+                return rendered ? <div key={String(item.label)}>{rendered}</div> : null
+              })}
             </nav>
           </>
         ) : null}
@@ -76,18 +121,10 @@ export function MobileNav({
           <>
             <Separator />
             <div className="grid grid-cols-1 gap-3">
-              {actions.map((action, index) => (
-                <Button
-                  key={`${action.href}-${index}`}
-                  asChild
-                  variant={index === 0 ? 'default' : 'outline'}
-                  className="w-full"
-                >
-                  <Link to={action.href} onClick={() => onOpenChange(false)}>
-                    {action.label}
-                  </Link>
-                </Button>
-              ))}
+              {actions.map((action) => {
+                const rendered = renderItem(action, () => onOpenChange(false))
+                return rendered ? <div key={String(action.label)}>{rendered}</div> : null
+              })}
             </div>
           </>
         ) : null}

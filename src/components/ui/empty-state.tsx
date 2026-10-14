@@ -8,15 +8,17 @@ import { cn } from '@/shared/lib/cn'
 export interface EmptyStateProps {
   title: string
   description: ReactNode
-  actionLabel?: string
-  onAction?: () => void
-  secondaryAction?: ReactNode
-  className?: string
+  action?: ReactNode | undefined
+  actionLabel?: string | undefined
+  onAction?: (() => void) | undefined
+  secondaryAction?: ReactNode | undefined
+  className?: string | undefined
 }
 
 export function EmptyState({
   title,
   description,
+  action,
   actionLabel,
   onAction,
   secondaryAction,
@@ -37,6 +39,7 @@ export function EmptyState({
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3">
+          {action}
           {actionLabel && onAction ? (
             <Button onClick={onAction}>{actionLabel}</Button>
           ) : null}

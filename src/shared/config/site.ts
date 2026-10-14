@@ -1,100 +1,21 @@
-import { routes } from '@/shared/config/routes'
+import { defaultLocale, locales } from '@/shared/config/locales'
 
-export interface NavigationLink {
-  label: string
-  href: string
-}
-
-export interface NavigationGroup {
-  title: string
-  links: NavigationLink[]
-}
+const siteUrl = import.meta.env.VITE_SITE_URL?.trim() || 'https://kumbhmelastore.in'
 
 export const site = {
   name: 'KumbhMelaStore',
-  devanagari: 'कुंभ मेला स्टोर',
-  url: 'https://kumbhmelastore.in',
-  domain: 'kumbhmelastore.in',
+  devanagari: 'कुम्भ मेला स्टोर',
+  url: siteUrl,
+  domain: new URL(siteUrl).hostname,
   description:
-    'Premium spiritual ecommerce for heritage-inspired rituals, gifting, and everyday sacred living.',
+    'Premium spiritual commerce for heritage-inspired rituals, gifting, and elevated daily living.',
   tagline:
     'A calm, premium commerce experience shaped by heritage, trust, and timeless design.',
   supportEmail: 'hello@kumbhmelastore.in',
+  brandLogoUrl:
+    'https://res.cloudinary.com/dvkyvryei/image/upload/v1783086946/Gemini_Generated_Image_-removebg-preview_qmciii.png',
+  footerBackgroundUrl:
+    'https://res.cloudinary.com/dvkyvryei/image/upload/v1791968638/Golden_Riverside_Temple_Ghat_Panorama_umq4gq.png',
+  defaultLocale,
+  locales,
 } as const
-
-export const primaryNavigation = [
-  { label: 'Home', href: routes.home },
-  { label: 'Collections', href: routes.collections },
-  { label: 'Categories', href: routes.categories },
-  { label: 'About', href: routes.about },
-  { label: 'Blog', href: routes.blog },
-  { label: 'Contact', href: routes.contact },
-] as const
-
-export const shopNavigation = [
-  { label: 'Cart', href: routes.cart },
-  { label: 'Wishlist', href: routes.wishlist },
-  { label: 'Track Order', href: routes.trackOrder },
-] as const
-
-export const accountNavigation = [
-  { label: 'Dashboard', href: routes.dashboard.home },
-  { label: 'Orders', href: routes.dashboard.orders },
-  { label: 'Profile', href: routes.dashboard.profile },
-  { label: 'Settings', href: routes.dashboard.settings },
-] as const
-
-export const legalNavigation = [
-  { label: 'Privacy Policy', href: routes.privacyPolicy },
-  { label: 'Terms', href: routes.terms },
-  { label: 'Refund Policy', href: routes.refundPolicy },
-  { label: 'Shipping Policy', href: routes.shippingPolicy },
-] as const
-
-export const footerNavigation = [
-  {
-    title: 'Shop',
-    links: [
-      { label: 'Collections', href: routes.collections },
-      { label: 'Categories', href: routes.categories },
-      { label: 'Cart', href: routes.cart },
-      { label: 'Wishlist', href: routes.wishlist },
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      { label: 'About', href: routes.about },
-      { label: 'Contact', href: routes.contact },
-      { label: 'Blog', href: routes.blog },
-      { label: 'Track Order', href: routes.trackOrder },
-    ],
-  },
-  {
-    title: 'Support',
-    links: [
-      { label: 'Dashboard', href: routes.dashboard.home },
-      { label: 'Orders', href: routes.dashboard.orders },
-      { label: 'Profile', href: routes.dashboard.profile },
-      { label: 'Settings', href: routes.dashboard.settings },
-    ],
-  },
-  {
-    title: 'Legal',
-    links: [
-      { label: 'Privacy Policy', href: routes.privacyPolicy },
-      { label: 'Terms', href: routes.terms },
-      { label: 'Refund Policy', href: routes.refundPolicy },
-      { label: 'Shipping Policy', href: routes.shippingPolicy },
-    ],
-  },
-] satisfies NavigationGroup[]
-
-export const dashboardNavigation = [
-  { label: 'Overview', href: routes.dashboard.home },
-  { label: 'Orders', href: routes.dashboard.orders },
-  { label: 'Wishlist', href: routes.wishlist },
-  { label: 'Saved Addresses', href: routes.dashboard.profile },
-  { label: 'Profile', href: routes.dashboard.profile },
-  { label: 'Settings', href: routes.dashboard.settings },
-] satisfies NavigationLink[]

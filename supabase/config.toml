@@ -1,0 +1,40 @@
+project_id = "kumbhmelastore"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = [
+  "http://localhost:5173",
+  "http://localhost:5173/hi",
+  "http://localhost:5173/en",
+  "http://localhost:5173/auth/callback",
+  "http://localhost:5173/auth/reset-password",
+]
+
+[auth.email]
+enable_confirmations = false
+double_confirm_changes = true
+
+[auth.external.google]
+enabled = false
+client_id = ""
+secret = ""
+
+[auth.external.github]
+enabled = false
+client_id = ""
+secret = ""
+redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"

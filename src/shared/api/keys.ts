@@ -1,23 +1,30 @@
+import type { Locale } from '@/shared/config/locales'
+
 export const queryKeys = {
-  all: ['kumbh-mela-store'] as const,
-  auth: ['kumbh-mela-store', 'auth'] as const,
-  products: {
-    all: ['kumbh-mela-store', 'products'] as const,
-    lists: () => [...queryKeys.products.all, 'list'] as const,
-    detail: (slug: string) => [...queryKeys.products.all, 'detail', slug] as const,
+  all: ['kumbh-melastore'] as const,
+  translations: ['kumbh-melastore', 'translations'] as const,
+  shell: {
+    all: ['kumbh-melastore', 'shell'] as const,
+    detail: (locale: Locale) => [...queryKeys.shell.all, locale] as const,
   },
-  collections: {
-    all: ['kumbh-mela-store', 'collections'] as const,
-    lists: () => [...queryKeys.collections.all, 'list'] as const,
-    detail: (slug: string) =>
-      [...queryKeys.collections.all, 'detail', slug] as const,
+  pages: {
+    all: ['kumbh-melastore', 'pages'] as const,
+    detail: (slug: string) => [...queryKeys.pages.all, slug] as const,
   },
-  orders: {
-    all: ['kumbh-mela-store', 'orders'] as const,
-    lists: () => [...queryKeys.orders.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.orders.all, 'detail', id] as const,
+  catalog: {
+    products: ['kumbh-melastore', 'catalog', 'products'] as const,
+    collections: ['kumbh-melastore', 'catalog', 'collections'] as const,
   },
-  blog: {
-    all: ['kumbh-mela-store', 'blog'] as const,
+  auth: ['kumbh-melastore', 'auth'] as const,
+  orderTracking: ['kumbh-melastore', 'order-tracking'] as const,
+  dashboard: {
+    all: ['kumbh-melastore', 'dashboard'] as const,
+    detail: (userId: string) => [...queryKeys.dashboard.all, userId] as const,
+  },
+  admin: {
+    orders: ['kumbh-melastore', 'admin', 'orders'] as const,
+    users: ['kumbh-melastore', 'admin', 'users'] as const,
+    content: ['kumbh-melastore', 'admin', 'content'] as const,
+    settings: ['kumbh-melastore', 'admin', 'settings'] as const,
   },
 } as const

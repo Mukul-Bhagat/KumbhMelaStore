@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Seo } from '@/components/layout/seo'
 import { ErrorState } from '@/components/ui/error-state'
@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { routes } from '@/shared/config/routes'
 
 export function Component() {
+  const navigate = useNavigate()
+
   return (
     <div className="grid min-h-[70svh] place-items-center">
       <Seo title="404" description="The requested page could not be found." noIndex />
@@ -14,7 +16,7 @@ export function Component() {
         description="The link may be outdated or the page may have moved."
         retryLabel="Back to home"
         onRetry={() => {
-          window.location.href = routes.home
+          navigate(routes.home)
         }}
         secondaryAction={
           <Button asChild variant="outline">

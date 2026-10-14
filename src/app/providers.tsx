@@ -2,6 +2,7 @@ import { type PropsWithChildren, useEffect } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 
+import { AuthProvider } from '@/shared/auth/provider'
 import { queryClient } from '@/shared/api/query-client'
 import { useUiStore } from '@/shared/stores/ui-store'
 import { useMounted } from '@/shared/hooks/use-mounted'
@@ -39,7 +40,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeHydrator />
-      {children}
+      <AuthProvider>{children}</AuthProvider>
       <Toaster
         richColors
         position="top-right"

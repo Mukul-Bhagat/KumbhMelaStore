@@ -1,107 +1,128 @@
-import { Link } from 'react-router-dom'
+import { Minus, Plus, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { CloudinaryImage } from '@/components/media/cloudinary-image'
-import { Reveal } from '@/components/layout/reveal'
-import { Seo } from '@/components/layout/seo'
 import { SectionHeading } from '@/components/layout/section-heading'
-import { Badge } from '@/components/ui/badge'
+import { Seo } from '@/components/layout/seo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { bestSellers } from '@/shared/data/site-content'
+import { EmptyState } from '@/components/ui/empty-state'
 import { routes } from '@/shared/config/routes'
 import { formatCurrency } from '@/shared/lib/format'
+import { useCartStore } from '@/shared/stores/cart-store'
 
 export function Component() {
-  const items = bestSellers.slice(0, 2)
-  const subtotal = items.reduce((total, product) => total + product.price, 0)
+  const navigate = useNavigate()
+  const items = useCartStore((state) => state.items)
+  const setQuantity = useCartStore((state) => state.setQuantity)
+  const removeItem = useCartStore((state) => state.removeItem)
+  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const currency = items[0]?.currency ?? 'INR'
 
   return (
-    <div className="space-y-16">
-      <Seo title="Cart" description="Review items before checkout." />
-
-      <Reveal>
-        <section className="space-y-5">
-          <Badge variant="premium">Shopping cart</Badge>
+    <div className="space-y-8">
+      <Seo title="Cart" description="Review the items in your shopping cart." />
+      <SectionHeading title="Your cart" description="Review your selected products before checkout." />
+      {items.length === 0 ? (
+        <EmptyState
+          title="Your cart is empty"
+          description="Explore our products and add something meaningful to your cart."
+          actionLabel="Browse products"
+          onAction={() => {
+            navigate(routes.products)
+          }}
+          secondaryAction={
+            <Button asChild variant="outline">
+              <Link to={routes.collections}>Explore collections</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
-            <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-              Items selected for a calm, premium checkout.
-            </h1>
-            <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              The cart uses generous spacing and clear summary cards so the final step
-              feels reassuring instead of rushed.
-            </p>
-          </div>
-        </section>
-      </Reveal>
-
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <Reveal>
-          <div className="space-y-4">
-            {items.map((product) => (
-              <Card key={product.slug} className="shadow-[var(--shadow-soft)]">
-                <CardContent className="grid gap-4 p-5 sm:grid-cols-[120px_minmax(0,1fr)_auto] sm:items-center">
-                  <div className="overflow-hidden rounded-[var(--radius-card)]">
-                    <CloudinaryImage
-                      publicId={product.imageId}
-                      alt={product.name}
-                      className="aspect-square h-full w-full object-cover"
-                    />
-                  </div>
+            {items.map((item) => (
+              <Card key={item.productId} className="overflow-hidden">
+                <CardContent className="grid gap-5 p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-center">
+                  <Link to={routes.productDetail(item.slug)} className="block">
+                    <div className="aspect-square overflow-hidden rounded-[var(--radius-field)] bg-surface">
+                      {item.image ? (
+                        <CloudinaryImage publicId={item.image} alt={item.name} />
+                      ) : (
+                        <div className="grid h-full place-items-center font-display text-lg">
+                          {item.name}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
                   <div className="space-y-2">
-                    <Badge variant="outline">{product.category}</Badge>
-                    <h2 className="font-display text-2xl font-semibold tracking-tight">
-                      {product.name}
-                    </h2>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {product.summary}
+                    <Link
+                      to={routes.productDetail(item.slug)}
+                      className="font-display text-xl font-semibold hover:text-primary"
+                    >
+                      {item.name}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {formatCurrency(item.price, item.currency)} each
                     </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label={`Decrease quantity of ${item.name}`}
+                        onClick={() => setQuantity(item.productId, item.quantity - 1)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="min-w-8 text-center" aria-live="polite">
+                        {item.quantity}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label={`Increase quantity of ${item.name}`}
+                        onClick={() => setQuantity(item.productId, item.quantity + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <p className="font-display text-2xl font-semibold">
-                    {formatCurrency(product.price)}
-                  </p>
+                  <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
+                    <p className="font-semibold">
+                      {formatCurrency(item.price * item.quantity, item.currency)}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(item.productId)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </Reveal>
-
-        <Reveal delay={0.08}>
-          <Card className="shadow-[var(--shadow-elevated)]">
+          <Card className="h-fit">
             <CardContent className="space-y-5 p-6">
-              <SectionHeading
-                eyebrow="Summary"
-                title="Order overview"
-                description="The checkout summary keeps shipping and total information visible at a glance."
-              />
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
-                  <span className="font-medium">Calculated at checkout</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Packaging</span>
-                  <span className="font-medium">Included</span>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="font-display text-2xl font-semibold">Estimated total</span>
-                <span className="font-display text-2xl font-semibold">
-                  {formatCurrency(subtotal)}
-                </span>
+              <h2 className="font-display text-2xl font-semibold">Order summary</h2>
+              <div className="flex justify-between border-t border-border pt-4">
+                <span>Subtotal</span>
+                <span className="font-semibold">{formatCurrency(total, currency)}</span>
               </div>
               <Button asChild className="w-full">
-                <Link to={routes.checkout}>Proceed to checkout</Link>
+                <Link to={routes.checkout}>Continue to checkout</Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link to={routes.products}>Continue shopping</Link>
               </Button>
             </CardContent>
           </Card>
-        </Reveal>
-      </section>
+        </div>
+      )}
     </div>
   )
 }

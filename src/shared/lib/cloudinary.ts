@@ -1,3 +1,5 @@
+import { getPublicEnv } from '@/shared/config/env'
+
 export interface CloudinaryTransformOptions {
   width?: number
   height?: number
@@ -7,7 +9,77 @@ export interface CloudinaryTransformOptions {
   gravity?: 'auto' | 'face' | 'north' | 'south' | 'west' | 'east' | string
 }
 
-const DEFAULT_CLOUD_NAME = 'demo'
+export interface CloudinaryUploadResult {
+  publicId: string
+  secureUrl: string
+  width: number
+  height: number
+  format: string
+}
+
+type CloudinaryUploadResponse = {
+  public_id?: unknown
+  secure_url?: unknown
+  width?: unknown
+  height?: unknown
+  format?: unknown
+  error?: { message?: unknown }
+}
+
+export async function uploadCloudinaryImage(file: File): Promise<CloudinaryUploadResult> {
+  const { VITE_CLOUDINARY_CLOUD_NAME: cloudName, VITE_CLOUDINARY_UPLOAD_PRESET: uploadPreset } =
+    getPublicEnv()
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error(
+      'Image upload is not configured. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to an unsigned, restricted Cloudinary upload preset.',
+    )
+  }
+
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) {
+    throw new Error('Choose a JPG, PNG, WebP, or AVIF image.')
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('Images must be 10 MB or smaller.')
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('upload_preset', uploadPreset)
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+    { method: 'POST', body: formData },
+  )
+  const payload = (await response.json()) as CloudinaryUploadResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof payload.error?.message === 'string'
+        ? payload.error.message
+        : `Cloudinary upload failed (${response.status}).`,
+    )
+  }
+
+  if (
+    typeof payload.public_id !== 'string' ||
+    typeof payload.secure_url !== 'string' ||
+    typeof payload.width !== 'number' ||
+    typeof payload.height !== 'number' ||
+    typeof payload.format !== 'string'
+  ) {
+    throw new Error('Cloudinary returned an incomplete image record.')
+  }
+
+  return {
+    publicId: payload.public_id,
+    secureUrl: payload.secure_url,
+    width: payload.width,
+    height: payload.height,
+    format: payload.format,
+  }
+}
 
 function normalizePublicId(publicId: string) {
   return publicId.replace(/^\/+/, '')
@@ -55,8 +127,11 @@ export function buildCloudinaryUrl(
     return publicId
   }
 
-  const cloudName =
-    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim() || DEFAULT_CLOUD_NAME
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim()
+
+  if (!cloudName) {
+    return normalizePublicId(publicId)
+  }
 
   return `https://res.cloudinary.com/${cloudName}/image/upload/${createTransformString(
     options,
