@@ -44,9 +44,6 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
   const shell = useSiteShell()
 
   const brandName = shell.data ? t(shell.data.brand.nameKey, site.name) : site.name
-  const brandDevanagari = shell.data
-    ? t(shell.data.brand.devanagariKey, site.devanagari)
-    : site.devanagari
   const title = shell.data ? t(shell.data.brand.nameKey, site.name) : site.name
   const description = shell.data
     ? t(shell.data.brand.descriptionKey, site.description)
@@ -128,18 +125,16 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
         className,
       )}
     >
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
         <BrandMark
           linked
-          size="sm"
+          size="md"
           name={brandName}
-          devanagari={brandDevanagari}
-          className="hidden sm:inline-flex"
+          className="hidden sm:inline-flex shrink-0"
         />
         <BrandMark
           linked
           size="sm"
-          variant="symbol"
           name={brandName}
           className="sm:hidden"
         />

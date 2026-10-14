@@ -15,7 +15,7 @@ export const site = {
   brandLogoUrl:
     'https://res.cloudinary.com/dvkyvryei/image/upload/v1783086946/Gemini_Generated_Image_-removebg-preview_qmciii.png',
   footerBackgroundUrl:
-    'https://res.cloudinary.com/dvkyvryei/image/upload/v1791968638/Golden_Riverside_Temple_Ghat_Panorama_umq4gq.png',
+    'https://res.cloudinary.com/dvkyvryei/image/upload/v1791971290/eaa7e624-a772-4790-9818-4a731e6de0c9_hllipg.png',
   defaultLocale,
   locales,
 } as const
