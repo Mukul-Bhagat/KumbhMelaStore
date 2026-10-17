@@ -7,14 +7,33 @@ create unique index if not exists orders_user_checkout_request_unique
 
 drop policy if exists "orders_insert_self_or_admin" on public.orders;
 drop policy if exists "orders_update_self_or_admin" on public.orders;
-drop policy if exists "orders_update_admin" on public.orders;
 
-create policy "orders_update_admin"
-on public.orders
-for update
-to authenticated
-using (public.is_super_admin())
-with check (public.is_super_admin());
+do $$
+declare
+  v_policy pg_policies%rowtype;
+begin
+  select *
+  into v_policy
+  from pg_policies
+  where schemaname = 'public'
+    and tablename = 'orders'
+    and policyname = 'orders_update_admin';
+
+  if not found then
+    create policy "orders_update_admin"
+    on public.orders
+    for update
+    to authenticated
+    using (public.is_super_admin())
+    with check (public.is_super_admin());
+  elsif v_policy.cmd <> 'UPDATE'
+    or v_policy.roles <> array['authenticated']::name[]
+    or regexp_replace(coalesce(v_policy.qual, ''), '[[:space:]()]', '', 'g') <> 'is_super_admin'
+    or regexp_replace(coalesce(v_policy.with_check, ''), '[[:space:]()]', '', 'g') <> 'is_super_admin' then
+    raise exception 'Existing public.orders policy orders_update_admin does not match the expected Super Admin-only update rule; inspect it before continuing.';
+  end if;
+end;
+$$;
 
 create or replace function public.place_order(
   p_cart_items jsonb,

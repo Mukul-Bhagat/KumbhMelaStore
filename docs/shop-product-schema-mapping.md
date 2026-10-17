@@ -45,6 +45,10 @@ links do not delete Cloudinary assets.
 
 - Migrations are forward-only and additive; do not rerun the foundation
   migration against an existing database.
+- The order migration preserves an existing `orders_update_admin` policy only
+  when it matches the expected authenticated Super Admin-only update rule; it
+  creates the policy when absent and stops for inspection if the existing rule
+  differs. It does not drop that policy to work around duplicate-policy errors.
 - The migrations have not been applied or executed against local, test, or
   hosted PostgreSQL in this work session. Validate them against a restored
   non-production copy of the target schema before production rollout.

@@ -1,4 +1,4 @@
-import { Menu } from 'lucide-react'
+import { Menu, ShoppingBag, UserRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
@@ -9,10 +9,7 @@ import { useAuth } from '@/shared/auth/provider'
 import { useLocaleActions } from '@/shared/hooks/use-locale'
 import { useSiteShell, useTranslate } from '@/shared/cms/hooks'
 import { routes } from '@/shared/config/routes'
-import type { Locale } from '@/shared/config/locales'
 import { site } from '@/shared/config/site'
-import { resolveLocalizedHref } from '@/shared/lib/navigation'
-
 import { LanguageToggleButton } from './language-toggle'
 import { MobileNav, type MobileNavItem } from './mobile-nav'
 
@@ -21,22 +18,7 @@ export interface SiteHeaderProps {
   className?: string
 }
 
-function resolveMenuItems(
-  items: Array<{ labelKey: string; href: string }>,
-  t: (key: string, fallback?: string) => string,
-  locale: Locale,
-) {
-  return items.map((item) => ({
-    label: t(item.labelKey, item.labelKey),
-    href: resolveLocalizedHref(item.href, locale),
-    external:
-      /^(https?:|mailto:|tel:)/.test(item.href) ||
-      item.href.startsWith('javascript:') ||
-      item.href.startsWith('#'),
-  }))
-}
-
-export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps) {
+export function SiteHeader({ className }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const auth = useAuth()
   const { locale } = useLocaleActions()
@@ -50,45 +32,15 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
     : site.description
 
   const desktopMenu = useMemo(() => {
-    const menu =
-      variant === 'shop'
-        ? shell.data?.navigation.shop ?? shell.data?.navigation.primary
-        : shell.data?.navigation.primary ?? shell.data?.navigation.shop
-
     const isHindi = locale === 'hi'
-    const defaults = [
+    return [
       { label: t('nav.home', isHindi ? 'होम' : 'Home'), href: routes.forLocale(locale, ''), external: false },
       { label: t('nav.products', isHindi ? 'उत्पाद' : 'Products'), href: routes.forLocale(locale, 'products'), external: false },
-      { label: t('nav.collections', isHindi ? 'संग्रह' : 'Collections'), href: routes.forLocale(locale, 'collections'), external: false },
+      { label: locale === 'en' ? 'Journal' : t('nav.journal', 'जर्नल'), href: routes.forLocale(locale, 'blog'), external: false },
       { label: t('nav.about', isHindi ? 'हमारे बारे में' : 'About'), href: routes.forLocale(locale, 'about'), external: false },
-      { label: t('nav.contact', isHindi ? 'संपर्क' : 'Contact'), href: routes.forLocale(locale, 'contact'), external: false },
+      { label: locale === 'en' ? 'Contact Us' : t('nav.contact_us', 'संपर्क करें'), href: routes.forLocale(locale, 'contact'), external: false },
     ]
-    const configured = menu?.items.length ? resolveMenuItems(menu.items, t, locale) : []
-
-    return [
-      ...configured,
-      ...defaults.filter((item) => !configured.some((configuredItem) => configuredItem.href === item.href)),
-    ]
-  }, [locale, shell.data?.navigation.primary, shell.data?.navigation.shop, t, variant])
-
-  const secondaryMenu = useMemo(() => {
-    const menu =
-      variant === 'shop'
-        ? shell.data?.navigation.account
-        : shell.data?.navigation.shop ?? shell.data?.navigation.account
-
-    if (menu?.items.length) {
-      return resolveMenuItems(menu.items, t, locale).filter(
-        (item) => !desktopMenu.some((primaryItem) => primaryItem.href === item.href),
-      )
-    }
-
-    const isHindi = locale === 'hi'
-    return [
-      { label: t('nav.faq', isHindi ? 'अक्सर पूछे जाने वाले प्रश्न' : 'FAQ'), href: routes.forLocale(locale, 'faq'), external: false },
-      { label: t('nav.track_order', isHindi ? 'ऑर्डर ट्रैक करें' : 'Track order'), href: routes.forLocale(locale, 'track-order'), external: false },
-    ].filter((item) => !desktopMenu.some((primaryItem) => primaryItem.href === item.href))
-  }, [desktopMenu, locale, shell.data?.navigation.account, shell.data?.navigation.shop, t, variant])
+  }, [locale, t])
 
   const authAction: MobileNavItem = auth.status === 'authenticated'
     ? {
@@ -102,19 +54,28 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
 
   const desktopAuthButton = auth.status === 'authenticated'
     ? (
-      <Button asChild variant="ghost" size="sm">
-        <Link to={routes.forLocale(locale, 'dashboard')}>{t('nav.dashboard', 'Dashboard')}</Link>
+      <Button asChild variant="ghost" size="icon-sm" aria-label={t('nav.dashboard', 'Dashboard')} title={t('nav.dashboard', 'Dashboard')}>
+        <Link to={routes.forLocale(locale, 'dashboard')}>
+          <UserRound className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">{t('nav.dashboard', 'Dashboard')}</span>
+        </Link>
       </Button>
     )
     : (
-      <Button asChild variant="ghost" size="sm">
-        <Link to={routes.forLocale(locale, 'auth/sign-in')}>{t('nav.sign_in', 'Sign in')}</Link>
+      <Button asChild variant="ghost" size="icon-sm" aria-label={t('nav.sign_in', 'Sign in')} title={t('nav.sign_in', 'Sign in')}>
+        <Link to={routes.forLocale(locale, 'auth/sign-in')}>
+          <UserRound className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">{t('nav.sign_in', 'Sign in')}</span>
+        </Link>
       </Button>
     )
 
   const cartButton = (
-    <Button asChild variant="default" size="sm">
-      <Link to={routes.forLocale(locale, 'cart')}>{t('nav.cart', 'Cart')}</Link>
+    <Button asChild variant="ghost" size="icon-sm" aria-label={t('nav.cart', 'Cart')} title={t('nav.cart', 'Cart')}>
+      <Link to={routes.forLocale(locale, 'cart')}>
+        <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only">{t('nav.cart', 'Cart')}</span>
+      </Link>
     </Button>
   )
 
@@ -176,9 +137,6 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <LanguageToggleButton />
           <div className="hidden items-center gap-2 xl:flex">
-            <Button asChild variant="outline" size="sm">
-              <Link to={routes.trackOrder}>{t('nav.track_order', 'Track order')}</Link>
-            </Button>
             {desktopAuthButton}
             {cartButton}
           </div>
@@ -202,13 +160,7 @@ export function SiteHeader({ variant = 'marketing', className }: SiteHeaderProps
         title={title}
         description={description}
         primaryLinks={desktopMenu}
-        secondaryLinks={secondaryMenu}
         actions={[
-          {
-            label: t('nav.track_order', 'Track order'),
-            href: routes.trackOrder,
-            variant: 'outline',
-          },
           authAction,
           {
             label: t('nav.cart', 'Cart'),

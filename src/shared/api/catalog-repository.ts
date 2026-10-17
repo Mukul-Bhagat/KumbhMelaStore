@@ -67,6 +67,13 @@ export interface ProductSummaryRecord {
   primaryImage: MediaRow | null
 }
 
+export interface ProductSummaryPage {
+  products: ProductSummaryRecord[]
+  totalCount: number
+}
+
+export type ProductCatalogSort = 'newest' | 'name'
+
 export interface CollectionSummaryRecord {
   id: string
   slug: string
@@ -143,6 +150,49 @@ export async function fetchActiveProductSummaries(): Promise<ProductSummaryRecor
   }
 
   return hydrateProductSummaries(products ?? [])
+}
+
+export async function fetchActiveProductPage({
+  search,
+  sort,
+  page,
+  pageSize,
+}: {
+  search: string
+  sort: ProductCatalogSort
+  page: number
+  pageSize: number
+}): Promise<ProductSummaryPage> {
+  const supabase = getSupabaseBrowserClient()
+  const start = (page - 1) * pageSize
+  let query = supabase
+    .from('products')
+    .select(
+      'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_active, material, dimensions, metadata, created_at, updated_at',
+      { count: 'exact' },
+    )
+    .eq('is_active', true)
+    .eq('stock_status', 'active')
+
+  const searchTerm = search.normalize('NFKC').replace(/[^\p{L}\p{N}\s-]/gu, '').trim()
+  if (searchTerm) {
+    const pattern = `%${searchTerm}%`
+    query = query.or(
+      `slug.ilike.${pattern},sku.ilike.${pattern},metadata->name->>en.ilike.${pattern},metadata->name->>hi.ilike.${pattern}`,
+    )
+  }
+
+  query = sort === 'name'
+    ? query.order('metadata->name->>en', { ascending: true }).order('slug', { ascending: true })
+    : query.order('created_at', { ascending: false })
+
+  const { data, error, count } = await query.range(start, start + pageSize - 1)
+  if (error) throw error
+
+  return {
+    products: await hydrateProductSummaries(data ?? []),
+    totalCount: count ?? 0,
+  }
 }
 
 async function hydrateProductSummaries(products: CatalogProductRow[]) {

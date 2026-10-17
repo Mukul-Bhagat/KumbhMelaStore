@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { HomeFallback } from '@/components/catalog/home-fallback'
+import { HomeFeaturedProducts } from '@/components/catalog/home-featured-products'
 import { SectionHeading } from '@/components/layout/section-heading'
 import { Seo } from '@/components/layout/seo'
 import { usePageContent, useSiteShell, useTranslate } from '@/shared/cms/hooks'
@@ -723,6 +724,7 @@ export function CmsPage({
           hideMetrics={slug === 'home'}
         />
       ))}
+      {slug === 'home' ? <HomeFeaturedProducts /> : null}
     </div>
   )
 }
