@@ -47,6 +47,19 @@ pnpm dev
 - `pnpm build`
 - `pnpm lint`
 
+## Vercel SPA routing
+
+The site uses React Router browser-history routes. [vercel.json](./vercel.json)
+rewrites incoming paths to the Vite entry document so nested frontend routes
+can load directly or after a refresh; React Router then renders the matching
+page or its application-level 404. The app has no same-origin `/api` routes;
+browser data requests go directly to Supabase and Cloudinary.
+
+To validate locally, run `pnpm build` and `pnpm preview`, then open or refresh
+a nested route such as `/en/products` or `/en/auth/sign-in`. Deploy through
+the existing Vercel project when ready; the rewrite takes effect only with a
+new deployment. Do not change the project, domain, or environment settings.
+
 ## Notes
 
 - English is the default locale; valid saved language preferences and explicit `/hi` routes are preserved.
