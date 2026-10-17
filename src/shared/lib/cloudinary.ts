@@ -156,13 +156,27 @@ export function buildBlurDataUrl(
   background = '#f5efe6',
   foreground = '#b68952',
 ) {
+  const escapedLabel = label.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&apos;',
+    }
+    return entities[character]!
+  })
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="${label}">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="${escapedLabel}">
       <rect width="24" height="24" rx="8" fill="${background}" />
       <circle cx="12" cy="11" r="4.25" fill="none" stroke="${foreground}" stroke-width="1.5" />
       <path d="M6 16.5c1.9-1.5 3.9-2.2 6-2.2s4.1.7 6 2.2" fill="none" stroke="${foreground}" stroke-width="1.5" stroke-linecap="round" />
     </svg>
   `
 
-  return `data:image/svg+xml;base64,${btoa(svg)}`
+  const utf8Svg = Array.from(new TextEncoder().encode(svg), (byte) =>
+    String.fromCharCode(byte),
+  ).join('')
+
+  return `data:image/svg+xml;base64,${btoa(utf8Svg)}`
 }
