@@ -11,6 +11,23 @@ Production foundation for the KumbhMelaStore ecommerce platform built with React
 
 `VITE_SUPABASE_URL` must be the reachable URL for the intended project; do not substitute a guessed project reference. The included `supabase/seed.sql` is applied by the local `supabase db reset` workflow below and does not provision users in a hosted project. Hosted Super Admin access must be provisioned for that project through a trusted administrative workflow.
 
+### Hosted Supabase Auth configuration
+
+The app builds signup, OAuth, and password-reset callback URLs from the browser's current origin, then includes the selected `locale` in the callback query. This keeps local callbacks on the local origin and production callbacks on the deployed origin; redirects are not built from user-provided URLs.
+
+For the hosted production project, configure Supabase Dashboard → Authentication → URL Configuration:
+
+- Set **Site URL** to `https://kumbhmelastore.in`.
+- Add these **Redirect URLs** for the production app:
+  - `https://kumbhmelastore.in/auth/callback`
+  - `https://kumbhmelastore.in/auth/reset-password`
+- Add corresponding `https://www.kumbhmelastore.in/...` callback URLs only if the `www` hostname is also a served application origin.
+- For local development against this same hosted project, also allow `http://localhost:5173/auth/callback` and `http://localhost:5173/auth/reset-password`. Prefer a separate development Supabase project and keep its localhost allowlist there.
+
+Keep email confirmation enabled for hosted signup. In Authentication → Providers → Email, confirm the provider and confirmation settings; configure a verified custom SMTP sender/provider for production delivery and review its sending limits. The `enable_confirmations = false` setting in [supabase/config.toml](./supabase/config.toml) applies only to local Supabase CLI use. If hosted signup returns HTTP 429, inspect Supabase Auth logs and the email provider's delivery/rate-limit logs before adjusting project limits. Do not retry signup automatically or disable security limits to work around throttling.
+
+Set the production deployment's `VITE_SITE_URL` to `https://kumbhmelastore.in` for canonical site metadata; leave the local `.env` value at `http://localhost:5173`. Auth callbacks use the active browser origin rather than `VITE_SITE_URL`.
+
 ## Supabase Database
 
 The database foundation lives in:

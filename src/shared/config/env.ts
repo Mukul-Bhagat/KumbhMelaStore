@@ -1,7 +1,12 @@
 import { z } from 'zod'
 
+const defaultSiteUrl = 'https://kumbhmelastore.in'
+
 const publicEnvSchema = z.object({
-  VITE_SITE_URL: z.string().url().default('https://kumbhmelastore.in'),
+  VITE_SITE_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().url().default(defaultSiteUrl),
+  ),
   VITE_SUPABASE_URL: z.string().trim().url(),
   VITE_SUPABASE_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
   VITE_SUPABASE_ANON_KEY: z.string().trim().min(1).optional(),
