@@ -5,11 +5,11 @@ import { Seo } from '@/components/layout/seo'
 export function Component() {
   return (
     <div className="space-y-8">
-      <Seo title="Checkout" description="Save a delivery address and prepare the checkout foundation." />
+      <Seo title="Checkout" description="Confirm delivery details and place a cash-on-delivery order." />
       <SectionHeading
         eyebrow="Checkout"
-        title="Delivery details"
-        description="Save a delivery address to your Supabase account so the checkout flow can build on real customer data."
+        title="Complete your order"
+        description="Confirm your delivery details and place your order securely against current Supabase catalog prices."
       />
       <CheckoutForm />
     </div>

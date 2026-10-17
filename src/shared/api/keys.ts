@@ -23,6 +23,8 @@ export const queryKeys = {
   },
   admin: {
     orders: ['kumbh-melastore', 'admin', 'orders'] as const,
+    products: ['kumbh-melastore', 'admin', 'products'] as const,
+    productList: (filters: unknown) => [...queryKeys.admin.products, filters] as const,
     users: ['kumbh-melastore', 'admin', 'users'] as const,
     content: ['kumbh-melastore', 'admin', 'content'] as const,
     settings: ['kumbh-melastore', 'admin', 'settings'] as const,

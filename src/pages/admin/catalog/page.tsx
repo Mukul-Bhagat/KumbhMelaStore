@@ -1,24 +1,26 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 
 import { LoadingScreen } from '@/components/layout/loading-screen'
 import { SectionHeading } from '@/components/layout/section-heading'
 import { Seo } from '@/components/layout/seo'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { AdminResourcePanel, type CrudField } from '@/features/admin/ui/admin-resource-panel'
 import { ProductImagesPanel } from '@/features/admin/ui/product-images-panel'
 import { queryKeys } from '@/shared/api/keys'
+import { routes } from '@/shared/config/routes'
 import { getSupabaseBrowserClient } from '@/shared/api/supabase'
-import type { Database, Json } from '@/shared/types/database'
-import { readProductContent, withProductContent } from '@/shared/lib/product-content'
-import { humanizeSlug } from '@/shared/lib/format'
+import { useLocale } from '@/shared/hooks/use-locale'
+import type { Database } from '@/shared/types/database'
 
 type ProductRow = Database['public']['Tables']['products']['Row']
 type CategoryRow = Database['public']['Tables']['categories']['Row']
 type CollectionRow = Database['public']['Tables']['collections']['Row']
 type MediaRow = Database['public']['Tables']['media']['Row']
-type ProductInsert = Database['public']['Tables']['products']['Insert']
 type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 type CollectionInsert = Database['public']['Tables']['collections']['Insert']
 
@@ -34,7 +36,7 @@ async function fetchCatalogWorkspace(): Promise<CatalogWorkspace> {
   const [products, categories, collections, media] = await Promise.all([
     supabase
       .from('products')
-      .select('id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_featured, is_active, material, dimensions, metadata, created_at, updated_at')
+      .select('*')
       .order('created_at', { ascending: false }),
     supabase.from('categories').select('id, slug, image_media_id, parent_id, is_active, sort_order, created_at, updated_at').order('sort_order', { ascending: true }),
     supabase.from('collections').select('id, slug, cover_media_id, hero_media_id, is_featured, is_active, sort_order, created_at, updated_at').order('sort_order', { ascending: true }),
@@ -69,19 +71,13 @@ function requiredText(values: Record<string, unknown>, field: string) {
   return value.trim()
 }
 
-function optionalText(values: Record<string, unknown>, field: string) {
-  const value = values[field]
-  if (value == null || value === '') {
-    return null
-  }
-  if (typeof value !== 'string') {
+function optionalId(values: Record<string, unknown>, field: string) {
+  const rawValue = values[field]
+  if (rawValue == null || rawValue === '') return null
+  if (typeof rawValue !== 'string') {
     throw new Error(`${field} must be text.`)
   }
-  return value.trim() || null
-}
-
-function optionalId(values: Record<string, unknown>, field: string) {
-  const value = optionalText(values, field)
+  const value = rawValue.trim()
   if (value == null) {
     return null
   }
@@ -91,11 +87,8 @@ function optionalId(values: Record<string, unknown>, field: string) {
   return value
 }
 
-function numberValue(values: Record<string, unknown>, field: string, nullable = false) {
+function numberValue(values: Record<string, unknown>, field: string) {
   const value = values[field]
-  if (nullable && value == null) {
-    return null
-  }
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`${field} must be a valid number.`)
   }
@@ -108,63 +101,6 @@ function booleanValue(values: Record<string, unknown>, field: string) {
     throw new Error(`${field} must be true or false.`)
   }
   return value
-}
-
-function isJsonValue(value: unknown): value is Json {
-  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
-    return true
-  }
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue)
-  }
-  return (
-    typeof value === 'object' &&
-    Object.values(value).every(isJsonValue)
-  )
-}
-
-function productValues(values: Record<string, unknown>): ProductInsert {
-  const stockStatus = values.stock_status
-  if (stockStatus !== 'draft' && stockStatus !== 'active' && stockStatus !== 'archived') {
-    throw new Error('stock_status must be selected.')
-  }
-  const metadata = values.metadata
-  if (metadata != null && !isJsonValue(metadata)) {
-    throw new Error('metadata must be valid JSON.')
-  }
-  const nameEn = requiredText(values, 'name_en')
-  const nameHi = optionalText(values, 'name_hi')
-  const descriptionEn = optionalText(values, 'description_en')
-  const descriptionHi = optionalText(values, 'description_hi')
-
-  const basePriceValue = numberValue(values, 'base_price')
-  if (basePriceValue == null) {
-    throw new Error('base_price is required.')
-  }
-  const basePrice = basePriceValue
-  const compareAtPrice = numberValue(values, 'compare_at_price', true)
-  if (basePrice < 0 || (compareAtPrice != null && compareAtPrice < basePrice)) {
-    throw new Error('Prices must be non-negative, and the compare-at price cannot be lower than the base price.')
-  }
-
-  return {
-    slug: requiredText(values, 'slug'),
-    sku: requiredText(values, 'sku'),
-    category_id: optionalId(values, 'category_id'),
-    collection_id: optionalId(values, 'collection_id'),
-    currency: requiredText(values, 'currency').toUpperCase(),
-    base_price: basePrice,
-    compare_at_price: compareAtPrice,
-    stock_status: stockStatus,
-    is_featured: booleanValue(values, 'is_featured'),
-    is_active: booleanValue(values, 'is_active'),
-    material: optionalText(values, 'material'),
-    dimensions: optionalText(values, 'dimensions'),
-    metadata: withProductContent(metadata ?? null, {
-      name: { en: nameEn, hi: nameHi },
-      description: { en: descriptionEn, hi: descriptionHi },
-    }),
-  }
 }
 
 function categoryValues(values: Record<string, unknown>): CategoryInsert {
@@ -189,20 +125,12 @@ function collectionValues(values: Record<string, unknown>): CollectionInsert {
 }
 
 export function Component() {
+  const locale = useLocale()
+  const queryClient = useQueryClient()
   const workspace = useQuery({
     queryKey: queryKeys.dashboard.all,
     queryFn: fetchCatalogWorkspace,
   })
-
-  const categoryOptions = useMemo(
-    () => optionize(workspace.data?.categories ?? []),
-    [workspace.data?.categories],
-  )
-
-  const collectionOptions = useMemo(
-    () => optionize(workspace.data?.collections ?? []),
-    [workspace.data?.collections],
-  )
 
   const mediaOptions = useMemo(
     () => [
@@ -237,84 +165,13 @@ export function Component() {
   }
 
   const data = workspace.data
-  const productFields: CrudField[] = [
-    { name: 'slug', label: 'Slug', type: 'text', placeholder: 'sacred-kalash-set', required: true, nullable: false },
-    { name: 'sku', label: 'SKU', type: 'text', placeholder: 'KMS-1001', required: true, nullable: false },
-    {
-      name: 'name_en',
-      label: 'Product name (English)',
-      type: 'text',
-      placeholder: 'Sacred Kalash Set',
-      required: true,
-      nullable: false,
-      getValue: (row) => {
-        const metadata = row.metadata
-        return readProductContent(
-          metadata != null && isJsonValue(metadata) ? metadata : null,
-          'name',
-          'en',
-        ) ?? humanizeSlug(String(row.slug ?? ''))
-      },
-    },
-    {
-      name: 'name_hi',
-      label: 'Product name (Hindi)',
-      type: 'text',
-      placeholder: 'पवित्र कलश सेट',
-      getValue: (row) => readProductContent(
-        row.metadata != null && isJsonValue(row.metadata) ? row.metadata : null,
-        'name',
-        'hi',
-      ) ?? '',
-    },
-    {
-      name: 'description_en',
-      label: 'Description (English)',
-      type: 'textarea',
-      placeholder: 'Describe the product for customers.',
-      getValue: (row) => readProductContent(
-        row.metadata != null && isJsonValue(row.metadata) ? row.metadata : null,
-        'description',
-        'en',
-      ) ?? '',
-    },
-    {
-      name: 'description_hi',
-      label: 'Description (Hindi)',
-      type: 'textarea',
-      placeholder: 'ग्राहकों के लिए उत्पाद का विवरण लिखें।',
-      getValue: (row) => readProductContent(
-        row.metadata != null && isJsonValue(row.metadata) ? row.metadata : null,
-        'description',
-        'hi',
-      ) ?? '',
-    },
-    { name: 'category_id', label: 'Category', type: 'select', options: categoryOptions },
-    { name: 'collection_id', label: 'Collection', type: 'select', options: collectionOptions },
-    { name: 'currency', label: 'Currency', type: 'text', placeholder: 'INR', required: true, nullable: false, defaultValue: 'INR' },
-    { name: 'base_price', label: 'Base price', type: 'number', placeholder: '4999', required: true, nullable: false },
-    { name: 'compare_at_price', label: 'Compare at price', type: 'number', placeholder: '5999' },
-    {
-      name: 'stock_status',
-      label: 'Stock status',
-      type: 'select',
-      options: [
-        { label: 'Draft', value: 'draft' },
-        { label: 'Active', value: 'active' },
-        { label: 'Archived', value: 'archived' },
-      ],
-      defaultValue: 'draft',
-      helperText: 'Draft products are hidden from customers. Set to Active after the product details and images are ready.',
-      required: true,
-      nullable: false,
-    },
-    { name: 'is_featured', label: 'Featured product', type: 'boolean' },
-    { name: 'is_active', label: 'Visible', type: 'boolean', defaultValue: true },
-    { name: 'material', label: 'Material', type: 'text', placeholder: 'Copper, brass, and lacquer' },
-    { name: 'dimensions', label: 'Dimensions', type: 'text', placeholder: 'Height 18 cm' },
-    { name: 'metadata', label: 'Metadata', type: 'json', helperText: 'Store product details, badges, and SEO data as JSON.' },
-  ]
-
+  const refreshCatalogData = () => {
+    void workspace.refetch()
+    void queryClient.invalidateQueries({ queryKey: queryKeys.admin.products })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.products })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.collections })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.pages.all })
+  }
   const categoryFields: CrudField[] = [
     { name: 'slug', label: 'Slug', type: 'text', placeholder: 'ritual-essentials' },
     { name: 'image_media_id', label: 'Image', type: 'select', options: mediaOptions },
@@ -334,11 +191,11 @@ export function Component() {
 
   return (
     <div className="space-y-8">
-      <Seo title="Catalog" description="Manage products, categories, collections, and media in Supabase." />
+      <Seo title="Catalog" description="Manage categories, collections, and product media in Supabase." />
       <SectionHeading
         eyebrow="Super Admin"
         title="Catalog"
-        description="Products, categories, collections, and Cloudinary media are edited directly in the database."
+        description="Manage catalog organization and product media here. Product content, pricing, variants, and inventory use the dedicated product workspace."
       />
 
       <div className="flex flex-wrap gap-2">
@@ -348,43 +205,19 @@ export function Component() {
         <Badge variant="outline">{data?.categories.length ?? 0} categories</Badge>
       </div>
 
-      <AdminResourcePanel<ProductRow>
-        title="Products"
-        description="Create and publish products with English and Hindi names, descriptions, pricing, stock, and catalog placement. Add product images below by URL or Cloudinary upload."
-        rows={data?.products ?? []}
-        fields={productFields}
-        rowKey="id"
-        createLabel="Add product"
-        columns={[
-          { label: 'Product', render: (row) => readProductContent(row.metadata, 'name', 'en') ?? humanizeSlug(row.slug) },
-          { label: 'SKU', render: (row) => row.sku },
-          { label: 'Price', render: (row) => `${row.currency} ${Number(row.base_price).toFixed(2)}` },
-          { label: 'Status', render: (row) => row.stock_status },
-          { label: 'Visibility', render: (row) => row.is_active ? 'Visible' : 'Hidden' },
-          {
-            label: 'Featured',
-            render: (row) => (row.is_featured ? 'Yes' : 'No'),
-          },
-        ]}
-        onCreate={async (values) => {
-          const supabase = getSupabaseBrowserClient()
-          const { error } = await supabase.from('products').insert(productValues(values))
-          if (error) throw error
-        }}
-        onUpdate={async (row, values) => {
-          const supabase = getSupabaseBrowserClient()
-          const { error } = await supabase.from('products').update(productValues(values)).eq('id', row.id)
-          if (error) throw error
-        }}
-        onDelete={async (row) => {
-          const supabase = getSupabaseBrowserClient()
-          const { error } = await supabase.from('products').delete().eq('id', row.id)
-          if (error) throw error
-        }}
-        onRefresh={() => {
-          void workspace.refetch()
-        }}
-      />
+      <Card className="shadow-[var(--shadow-soft)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-5 p-6">
+          <div className="space-y-2">
+            <h2 className="font-display text-2xl font-semibold">Products</h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Manage product details, pricing, variants, inventory, tags, collections, and publication from the full product workspace.
+            </p>
+          </div>
+          <Button asChild>
+            <Link to={routes.forLocale(locale, 'admin/products')}>Open product manager</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <ProductImagesPanel products={data?.products ?? []} />
 
@@ -417,7 +250,7 @@ export function Component() {
             if (error) throw error
           }}
           onRefresh={() => {
-            void workspace.refetch()
+            refreshCatalogData()
           }}
         />
 
@@ -449,7 +282,7 @@ export function Component() {
             if (error) throw error
           }}
           onRefresh={() => {
-            void workspace.refetch()
+            refreshCatalogData()
           }}
         />
       </div>

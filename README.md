@@ -16,7 +16,11 @@ Production foundation for the KumbhMelaStore ecommerce platform built with React
 The database foundation lives in:
 
 - [supabase/migrations/20260703_000001_initial_foundation.sql](./supabase/migrations/20260703_000001_initial_foundation.sql)
+- [supabase/migrations/20261016_000001_order_workflow.sql](./supabase/migrations/20261016_000001_order_workflow.sql)
+- [supabase/migrations/20261017_000001_shop_product_management.sql](./supabase/migrations/20261017_000001_shop_product_management.sql)
 - [supabase/seed.sql](./supabase/seed.sql)
+
+The product-management migration adds product variants, inventory tracking and movement history, multi-collection/tag assignments, gallery ordering, and Super Admin product-management functions. Apply migrations in timestamp order to a local or explicitly approved Supabase project. Do not run them against production as part of local development or validation.
 
 ### Hosted Super Admin provisioning
 
@@ -49,6 +53,7 @@ pnpm dev
 - Hindi remains available through the language switch.
 - Admin product galleries accept HTTPS image URLs or direct browser uploads to Cloudinary. Uploads require a restricted unsigned preset; image metadata and product links are saved in Supabase.
 - The Super Admin console uses Supabase-backed managers for orders and their tracking history, profiles and non-Super-Admin role assignments, CMS pages/sections/translations/blogs/FAQs/policies/announcements, site settings, languages, navigation, and footer links.
+- Checkout places cash-on-delivery orders through a transactional Supabase function. It validates active product and variant prices on the server, locks and decrements tracked inventory, snapshots delivery/product/variant details, and writes the initial status event atomically. Customer cancellation and Super Admin fulfillment/payment/tracking updates are also authorized database functions; customer order detail reads remain scoped by RLS. Shipping and tax are zero until configured.
 - Admin data writes continue to rely on the existing `is_super_admin()` RLS policies. The Users screen does not create or delete Auth accounts, display other users' private Auth emails, change email confirmation, or grant `super_admin`; use the guarded provisioning workflow above for Super Admin access.
 - Profile status is application profile metadata and does not disable Supabase Auth sign-in. Orders are protected with RLS, and public tracking uses the restricted RPC projection only.
 - CMS managers edit existing routed pages; route slugs and templates are fixed in the page editor to avoid creating database pages that the client router cannot serve.

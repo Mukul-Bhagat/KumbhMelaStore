@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -7,6 +8,7 @@ import { Seo } from '@/components/layout/seo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Badge } from '@/components/ui/badge'
 import { routes } from '@/shared/config/routes'
 import { formatCurrency } from '@/shared/lib/format'
 import { useCartStore } from '@/shared/stores/cart-store'
@@ -16,6 +18,10 @@ export function Component() {
   const items = useCartStore((state) => state.items)
   const setQuantity = useCartStore((state) => state.setQuantity)
   const removeItem = useCartStore((state) => state.removeItem)
+  const finishCheckoutNow = useCartStore((state) => state.finishCheckoutNow)
+  useEffect(() => {
+    finishCheckoutNow(true)
+  }, [finishCheckoutNow])
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const currency = items[0]?.currency ?? 'INR'
 
@@ -41,7 +47,7 @@ export function Component() {
         <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
             {items.map((item) => (
-              <Card key={item.productId} className="overflow-hidden">
+              <Card key={`${item.productId}:${item.variantId ?? ''}`} className="overflow-hidden">
                 <CardContent className="grid gap-5 p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-center">
                   <Link to={routes.productDetail(item.slug)} className="block">
                     <div className="aspect-square overflow-hidden rounded-[var(--radius-field)] bg-surface">
@@ -64,13 +70,21 @@ export function Component() {
                     <p className="text-sm text-muted-foreground">
                       {formatCurrency(item.price, item.currency)} each
                     </p>
+                    {item.variantTitle ? (
+                      <p className="text-sm text-muted-foreground">Option: {item.variantTitle}</p>
+                    ) : null}
+                    {item.available === false ? (
+                      <Badge variant="error">Unavailable</Badge>
+                    ) : item.maxQuantity != null && item.quantity > item.maxQuantity ? (
+                      <p className="text-xs text-error">Quantity exceeds current availability.</p>
+                    ) : null}
                     <div className="flex items-center gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="icon-sm"
                         aria-label={`Decrease quantity of ${item.name}`}
-                        onClick={() => setQuantity(item.productId, item.quantity - 1)}
+                        onClick={() => setQuantity(item.productId, item.quantity - 1, item.variantId)}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
@@ -82,7 +96,8 @@ export function Component() {
                         variant="outline"
                         size="icon-sm"
                         aria-label={`Increase quantity of ${item.name}`}
-                        onClick={() => setQuantity(item.productId, item.quantity + 1)}
+                        onClick={() => setQuantity(item.productId, item.quantity + 1, item.variantId)}
+                        disabled={item.available === false || (item.maxQuantity != null && item.quantity >= item.maxQuantity)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -96,7 +111,7 @@ export function Component() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeItem(item.productId)}
+                      onClick={() => removeItem(item.productId, item.variantId)}
                     >
                       <Trash2 className="h-4 w-4" />
                       Remove

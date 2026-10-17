@@ -73,7 +73,7 @@ async function fetchOrders(): Promise<OrderRow[]> {
   const { data: orders, error } = await supabase
     .from('orders')
     .select(
-      'id, user_id, order_number, public_tracking_code, status, payment_status, payment_method, currency, subtotal, discount_total, shipping_total, tax_total, grand_total, coupon_id, shipping_address_snapshot, billing_address_snapshot, contact_email, contact_phone, placed_at, confirmed_at, shipped_at, delivered_at, cancelled_at, tracking_summary, created_at, updated_at',
+      'id, user_id, checkout_request_id, order_number, public_tracking_code, status, payment_status, payment_method, currency, subtotal, discount_total, shipping_total, tax_total, grand_total, coupon_id, shipping_address_snapshot, billing_address_snapshot, contact_email, contact_phone, placed_at, confirmed_at, shipped_at, delivered_at, cancelled_at, tracking_summary, created_at, updated_at',
     )
     .order('created_at', { ascending: false })
     .limit(200)
@@ -89,7 +89,7 @@ async function fetchOrders(): Promise<OrderRow[]> {
 
   const { data: items, error: itemsError } = await supabase
     .from('order_items')
-    .select('id, order_id, product_id, product_snapshot, quantity, unit_price, line_total, currency, created_at, updated_at')
+    .select('id, order_id, product_id, variant_id, product_snapshot, quantity, unit_price, line_total, currency, created_at, updated_at')
     .in('order_id', rows.map((order) => order.id))
     .order('created_at', { ascending: true })
 
@@ -302,38 +302,13 @@ export function Component() {
             throw new Error('Select a valid payment status.')
           }
 
-          const update: Database['public']['Tables']['orders']['Update'] = {
-            status,
-            payment_status: paymentStatus,
-            tracking_summary: optionalJson(values.tracking_summary),
-          }
-          const now = new Date().toISOString()
-          if (status === 'confirmed' && row.status !== 'confirmed') update.confirmed_at = now
-          if (status === 'in_transit' && row.status !== 'in_transit') update.shipped_at = now
-          if (status === 'delivered' && row.status !== 'delivered') update.delivered_at = now
-          if (status === 'cancelled' && row.status !== 'cancelled') update.cancelled_at = now
-
-          const { error } = await getSupabaseBrowserClient()
-            .from('orders')
-            .update(update)
-            .eq('id', row.id)
+          const { error } = await getSupabaseBrowserClient().rpc('admin_update_order', {
+            p_order_id: row.id,
+            p_status: status,
+            p_payment_status: paymentStatus,
+            p_tracking_summary: optionalJson(values.tracking_summary),
+          })
           if (error) throw error
-
-          if (status !== row.status) {
-            const { error: eventError } = await getSupabaseBrowserClient()
-              .from('order_status_events')
-              .insert({
-                order_id: row.id,
-                status,
-                note_key: `Order status updated to ${status.replaceAll('_', ' ')}`,
-                metadata: { source: 'admin', previous_status: row.status },
-              })
-            if (eventError) {
-              void queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders })
-              void queryClient.invalidateQueries({ queryKey: queryKeys.orderTracking })
-              throw new Error(`Order was updated, but its customer tracking history could not be recorded: ${eventError.message}`)
-            }
-          }
         }}
         onRefresh={() => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders })

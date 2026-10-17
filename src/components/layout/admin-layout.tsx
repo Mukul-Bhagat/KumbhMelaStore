@@ -16,6 +16,7 @@ import { cn } from '@/shared/lib/cn'
 const adminLinks = [
   { path: 'admin', labelKey: 'admin.overview' },
   { path: 'admin/content', labelKey: 'admin.content' },
+  { path: 'admin/products', labelKey: 'admin.products' },
   { path: 'admin/catalog', labelKey: 'admin.catalog' },
   { path: 'admin/orders', labelKey: 'admin.orders' },
   { path: 'admin/users', labelKey: 'admin.users' },

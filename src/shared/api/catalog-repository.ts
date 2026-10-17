@@ -2,10 +2,37 @@ import { getSupabaseBrowserClient } from '@/shared/api/supabase'
 import type { Database } from '@/shared/types/database'
 
 type ProductRow = Database['public']['Tables']['products']['Row']
+type CatalogProductRow = Pick<
+  ProductRow,
+  | 'id'
+  | 'slug'
+  | 'sku'
+  | 'currency'
+  | 'base_price'
+  | 'compare_at_price'
+  | 'material'
+  | 'dimensions'
+  | 'metadata'
+>
+type ProductDetailRow = CatalogProductRow &
+  Pick<
+    ProductRow,
+    | 'category_id'
+    | 'collection_id'
+    | 'stock_status'
+    | 'is_active'
+    | 'short_description'
+    | 'track_inventory'
+    | 'inventory_quantity'
+    | 'continue_selling_when_out_of_stock'
+    | 'created_at'
+    | 'updated_at'
+  >
 type CategoryRow = Database['public']['Tables']['categories']['Row']
 type CollectionRow = Database['public']['Tables']['collections']['Row']
 type ReviewRow = Database['public']['Tables']['reviews']['Row']
 type MediaRow = Database['public']['Tables']['media']['Row']
+type ProductVariantRow = Database['public']['Tables']['product_variants']['Row']
 
 export interface HydratedProductImage {
   id: string
@@ -16,10 +43,11 @@ export interface HydratedProductImage {
 }
 
 export interface ProductDetailRecord {
-  product: ProductRow
+  product: ProductDetailRow
   category: CategoryRow | null
   collection: CollectionRow | null
   images: HydratedProductImage[]
+  variants: ProductVariantRow[]
   reviews: ReviewRow[]
   averageRating: number | null
 }
@@ -30,7 +58,9 @@ export interface ProductSummaryRecord {
   sku: string
   currency: string
   basePrice: number
+  maxPrice: number
   compareAtPrice: number | null
+  hasVariants: boolean
   material: string | null
   dimensions: string | null
   metadata: ProductRow['metadata']
@@ -115,7 +145,7 @@ export async function fetchActiveProductSummaries(): Promise<ProductSummaryRecor
   return hydrateProductSummaries(products ?? [])
 }
 
-async function hydrateProductSummaries(products: ProductRow[]) {
+async function hydrateProductSummaries(products: CatalogProductRow[]) {
   const supabase = getSupabaseBrowserClient()
   const productIds = products.map((product) => product.id)
 
@@ -133,19 +163,39 @@ async function hydrateProductSummaries(products: ProductRow[]) {
     throw imagesError
   }
 
-  const mediaIds = Array.from(new Set((images ?? []).map((image) => image.media_id)))
-  const { data: media, error: mediaError } = await supabase
-    .from('media')
-    .select('id, provider, public_id, secure_url, alt_text, blur_data_url, width, height, format, metadata, is_public, created_by, created_at, updated_at')
-    .in('id', mediaIds.length > 0 ? mediaIds : ['00000000-0000-0000-0000-000000000000'])
+  const [variantsResult, mediaResult] = await Promise.all([
+    supabase
+      .from('product_variants')
+      .select('*')
+      .in('product_id', productIds)
+      .eq('is_active', true)
+      .order('price', { ascending: true }),
+    supabase
+      .from('media')
+      .select('id, provider, public_id, secure_url, alt_text, blur_data_url, width, height, format, metadata, is_public, created_by, created_at, updated_at')
+      .in(
+        'id',
+        Array.from(new Set((images ?? []).map((image) => image.media_id))).length > 0
+          ? Array.from(new Set((images ?? []).map((image) => image.media_id)))
+          : ['00000000-0000-0000-0000-000000000000'],
+      ),
+  ])
 
-  if (mediaError) {
-    throw mediaError
+  if (variantsResult.error) throw variantsResult.error
+  if (mediaResult.error) throw mediaResult.error
+
+  const mediaMap = new Map((mediaResult.data ?? []).map((entry) => [entry.id, entry]))
+  const variantsByProduct = new Map<string, ProductVariantRow[]>()
+  for (const variant of variantsResult.data ?? []) {
+    const productVariants = variantsByProduct.get(variant.product_id) ?? []
+    productVariants.push(variant)
+    variantsByProduct.set(variant.product_id, productVariants)
   }
 
-  const mediaMap = new Map((media ?? []).map((entry) => [entry.id, entry]))
-
   return products.map<ProductSummaryRecord>((product) => {
+    const productVariants = variantsByProduct.get(product.id) ?? []
+    const lowestVariant = productVariants[0]
+    const highestVariant = productVariants.at(-1)
     const imageRow = (images ?? []).find((image) => image.product_id === product.id && image.is_primary)
       ?? (images ?? []).find((image) => image.product_id === product.id)
 
@@ -154,8 +204,12 @@ async function hydrateProductSummaries(products: ProductRow[]) {
       slug: product.slug,
       sku: product.sku,
       currency: product.currency,
-      basePrice: Number(product.base_price),
-      compareAtPrice: product.compare_at_price != null ? Number(product.compare_at_price) : null,
+      basePrice: Number(lowestVariant?.price ?? product.base_price),
+      maxPrice: Number(highestVariant?.price ?? product.base_price),
+      compareAtPrice: (lowestVariant?.compare_at_price ?? product.compare_at_price) != null
+        ? Number(lowestVariant?.compare_at_price ?? product.compare_at_price)
+        : null,
+      hasVariants: productVariants.length > 0,
       material: product.material,
       dimensions: product.dimensions,
       metadata: product.metadata,
@@ -170,10 +224,11 @@ export async function fetchProductDetail(slug: string): Promise<ProductDetailRec
   const { data: product, error: productError } = await supabase
     .from('products')
     .select(
-      'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_featured, is_active, material, dimensions, metadata, created_at, updated_at',
+      'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_active, short_description, track_inventory, inventory_quantity, continue_selling_when_out_of_stock, material, dimensions, metadata, created_at, updated_at',
     )
     .eq('slug', slug)
     .eq('is_active', true)
+    .eq('stock_status', 'active')
     .maybeSingle()
 
   if (productError) {
@@ -184,7 +239,7 @@ export async function fetchProductDetail(slug: string): Promise<ProductDetailRec
     return null
   }
 
-  const [categoryResult, collectionResult, imagesResult, reviewsResult] = await Promise.all([
+  const [categoryResult, collectionResult, imagesResult, reviewsResult, variantsResult] = await Promise.all([
     product.category_id
       ? supabase.from('categories').select('id, slug, image_media_id, parent_id, is_active, sort_order, created_at, updated_at').eq('id', product.category_id).maybeSingle()
       : Promise.resolve({ data: null, error: null as never }),
@@ -202,9 +257,20 @@ export async function fetchProductDetail(slug: string): Promise<ProductDetailRec
       .eq('product_id', product.id)
       .eq('status', 'approved')
       .order('created_at', { ascending: false }),
+    supabase
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', product.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true }),
   ])
 
-  const firstError = categoryResult.error ?? collectionResult.error ?? imagesResult.error ?? reviewsResult.error
+  const firstError =
+    categoryResult.error ??
+    collectionResult.error ??
+    imagesResult.error ??
+    reviewsResult.error ??
+    variantsResult.error
   if (firstError) {
     throw firstError
   }
@@ -239,6 +305,7 @@ export async function fetchProductDetail(slug: string): Promise<ProductDetailRec
     category: categoryResult.data,
     collection: collectionResult.data,
     images,
+    variants: variantsResult.data ?? [],
     reviews: reviewsResult.data ?? [],
     averageRating,
   }
@@ -262,17 +329,41 @@ export async function fetchCollectionDetail(slug: string): Promise<CollectionDet
     return null
   }
 
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select('id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_featured, is_active, material, dimensions, metadata, created_at, updated_at')
+  const { data: assignedProducts, error: productsError } = await supabase
+    .from('product_collections')
+    .select('product_id')
     .eq('collection_id', collection.id)
+
+  if (productsError) throw productsError
+
+  const productIds = Array.from(new Set([
+    ...(assignedProducts ?? []).map((assignment) => assignment.product_id),
+  ]))
+  if (productIds.length === 0) {
+    const { data: primaryProducts, error: primaryError } = await supabase
+      .from('products')
+      .select(
+        'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, material, dimensions, metadata',
+      )
+      .eq('collection_id', collection.id)
+      .eq('is_active', true)
+      .eq('stock_status', 'active')
+      .order('created_at', { ascending: false })
+    if (primaryError) throw primaryError
+    return { collection, products: await hydrateProductSummaries(primaryProducts ?? []) }
+  }
+
+  const { data: products, error: assignedProductsError } = await supabase
+    .from('products')
+    .select(
+      'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, material, dimensions, metadata',
+    )
+    .in('id', productIds)
     .eq('is_active', true)
     .eq('stock_status', 'active')
     .order('created_at', { ascending: false })
 
-  if (productsError) {
-    throw productsError
-  }
+  if (assignedProductsError) throw assignedProductsError
 
   return {
     collection,
@@ -300,7 +391,9 @@ export async function fetchCategoryDetail(slug: string): Promise<CategoryDetailR
 
   const { data: products, error: productsError } = await supabase
     .from('products')
-    .select('id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, stock_status, is_featured, is_active, material, dimensions, metadata, created_at, updated_at')
+    .select(
+      'id, slug, sku, category_id, collection_id, currency, base_price, compare_at_price, material, dimensions, metadata',
+    )
     .eq('category_id', category.id)
     .eq('is_active', true)
     .eq('stock_status', 'active')

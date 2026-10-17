@@ -213,6 +213,18 @@ const router = createBrowserRouter([
                 lazy: () => import('@/pages/admin/catalog/page'),
               },
               {
+                path: 'products',
+                lazy: () => import('@/pages/admin/products/page'),
+              },
+              {
+                path: 'products/new',
+                lazy: () => import('@/pages/admin/products/product-editor-page'),
+              },
+              {
+                path: 'products/:productId',
+                lazy: () => import('@/pages/admin/products/product-editor-page'),
+              },
+              {
                 path: 'orders',
                 lazy: () => import('@/pages/admin/orders/page'),
               },

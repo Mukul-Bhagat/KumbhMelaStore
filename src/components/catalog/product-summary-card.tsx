@@ -53,8 +53,17 @@ export function ProductSummaryCard({ product }: { product: ProductSummaryRecord 
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Price</p>
             <p className="font-display text-xl font-semibold">
+              {product.hasVariants ? 'From ' : ''}
               {formatCurrency(product.basePrice, product.currency)}
+              {product.maxPrice > product.basePrice
+                ? ` – ${formatCurrency(product.maxPrice, product.currency)}`
+                : ''}
             </p>
+            {product.compareAtPrice != null && product.compareAtPrice > product.basePrice ? (
+              <p className="text-sm text-muted-foreground line-through">
+                {formatCurrency(product.compareAtPrice, product.currency)}
+              </p>
+            ) : null}
           </div>
           <Button asChild variant="outline" size="sm">
             <Link to={routes.forLocale(locale, `products/${product.slug}`)}>View details</Link>

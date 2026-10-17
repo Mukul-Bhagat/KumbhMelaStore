@@ -287,11 +287,33 @@ type Product = {
   id: string
   slug: string
   sku: string
+  barcode: string | null
+  product_type: string | null
+  vendor: string | null
+  short_description: string | null
   category_id: string | null
   collection_id: string | null
   currency: string
   base_price: number
   compare_at_price: number | null
+  cost_per_item: number | null
+  taxable: boolean
+  track_inventory: boolean
+  inventory_quantity: number
+  continue_selling_when_out_of_stock: boolean
+  low_stock_threshold: number
+  is_physical: boolean
+  weight: number | null
+  weight_unit: string
+  length: number | null
+  width: number | null
+  height: number | null
+  measurement_unit: string
+  country_of_origin: string | null
+  hs_code: string | null
+  product_options: Json
+  created_by: string | null
+  updated_by: string | null
   stock_status: 'draft' | 'active' | 'archived'
   is_featured: boolean
   is_active: boolean
@@ -300,6 +322,56 @@ type Product = {
   metadata: Json | null
   created_at: string
   updated_at: string
+}
+
+type ProductVariant = {
+  id: string
+  product_id: string
+  title: string
+  option_values: Json
+  sku: string | null
+  barcode: string | null
+  price: number
+  compare_at_price: number | null
+  track_inventory: boolean
+  inventory_quantity: number
+  continue_selling_when_out_of_stock: boolean
+  weight: number | null
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+type ProductCollection = {
+  product_id: string
+  collection_id: string
+  created_at: string
+}
+
+type ProductTag = {
+  id: string
+  name: string
+  created_at: string
+}
+
+type ProductTagAssignment = {
+  product_id: string
+  tag_id: string
+  created_at: string
+}
+
+type InventoryMovement = {
+  id: string
+  product_id: string
+  variant_id: string | null
+  quantity_delta: number
+  quantity_after: number
+  reason: string
+  source: 'admin' | 'order'
+  order_id: string | null
+  created_by: string | null
+  created_at: string
 }
 
 type ProductImage = {
@@ -373,6 +445,7 @@ type Coupon = {
 type Order = {
   id: string
   user_id: string
+  checkout_request_id: string | null
   order_number: string
   public_tracking_code: string
   status: 'draft' | 'placed' | 'confirmed' | 'packed' | 'in_transit' | 'delivered' | 'cancelled'
@@ -403,6 +476,7 @@ type OrderItem = {
   id: string
   order_id: string
   product_id: string | null
+  variant_id: string | null
   product_snapshot: Json | null
   quantity: number
   unit_price: number
@@ -470,6 +544,27 @@ export interface Database {
       categories: TableShape<Category, Partial<Category>, Partial<Category>>
       collections: TableShape<Collection, Partial<Collection>, Partial<Collection>>
       products: TableShape<Product, Partial<Product>, Partial<Product>>
+      product_variants: TableShape<
+        ProductVariant,
+        Partial<ProductVariant>,
+        Partial<ProductVariant>
+      >
+      product_collections: TableShape<
+        ProductCollection,
+        Partial<ProductCollection>,
+        Partial<ProductCollection>
+      >
+      product_tags: TableShape<ProductTag, Partial<ProductTag>, Partial<ProductTag>>
+      product_tag_assignments: TableShape<
+        ProductTagAssignment,
+        Partial<ProductTagAssignment>,
+        Partial<ProductTagAssignment>
+      >
+      inventory_movements: TableShape<
+        InventoryMovement,
+        Partial<InventoryMovement>,
+        Partial<InventoryMovement>
+      >
       product_images: TableShape<ProductImage, Partial<ProductImage>, Partial<ProductImage>>
       reviews: TableShape<Review, Partial<Review>, Partial<Review>>
       review_replies: TableShape<ReviewReply, Partial<ReviewReply>, Partial<ReviewReply>>
@@ -503,10 +598,68 @@ export interface Database {
         }
         Returns: Json
       }
+      place_order: {
+        Args: {
+          p_cart_items: Json
+          p_checkout_request_id: string
+          p_shipping_address: Json
+        }
+        Returns: Array<{
+          currency: string
+          grand_total: number
+          order_id: string
+          order_number: string
+          public_tracking_code: string
+        }>
+      }
+      cancel_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      admin_update_order: {
+        Args: {
+          p_order_id: string
+          p_status: Database['public']['Enums']['order_status']
+          p_payment_status: Database['public']['Enums']['payment_status']
+          p_tracking_summary: Json | null
+        }
+        Returns: undefined
+      }
+      admin_save_product: {
+        Args: {
+          p_collection_ids: string[]
+          p_inventory_reason?: string | null
+          p_product: Json
+          p_product_id: string | null
+          p_tags: string[]
+          p_variants: Json
+        }
+        Returns: string
+      }
+      admin_list_products: {
+        Args: {
+          p_category_id?: string | null
+          p_collection_id?: string | null
+          p_inventory_status?: string | null
+          p_page?: number
+          p_page_size?: number
+          p_search?: string | null
+          p_sort?: string
+          p_ascending?: boolean
+          p_status?: string | null
+        }
+        Returns: Json
+      }
+      admin_reorder_product_images: {
+        Args: { p_images: Json; p_product_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       locale_code: 'hi' | 'en'
       role_slug: 'customer' | 'super_admin' | 'admin' | 'vendor'
+      order_status: 'draft' | 'placed' | 'confirmed' | 'packed' | 'in_transit' | 'delivered' | 'cancelled'
+      payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'cash_on_delivery'
     }
     CompositeTypes: Record<string, never>
   }

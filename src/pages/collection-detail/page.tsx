@@ -145,7 +145,11 @@ export function Component() {
                       ) : null}
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-display text-xl font-semibold">
-                          {formatCurrency(product.basePrice)}
+                          {product.hasVariants ? 'From ' : ''}
+                          {formatCurrency(product.basePrice, product.currency)}
+                          {product.maxPrice > product.basePrice
+                            ? ` – ${formatCurrency(product.maxPrice, product.currency)}`
+                            : ''}
                         </p>
                         <Button asChild variant="outline" size="sm">
                           <Link to={routes.forLocale(locale, `products/${product.slug}`)}>View</Link>

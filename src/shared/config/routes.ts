@@ -118,6 +118,9 @@ export const routes = {
     get catalog() {
       return localized('admin/catalog')
     },
+    get products() {
+      return localized('admin/products')
+    },
     get orders() {
       return localized('admin/orders')
     },
