@@ -111,6 +111,7 @@ export function Component() {
                       type="button"
                       variant="ghost"
                       size="sm"
+                        className="text-error hover:border-error/30 hover:bg-error/10 hover:text-error"
                       onClick={() => removeItem(item.productId, item.variantId)}
                     >
                       <Trash2 className="h-4 w-4" />

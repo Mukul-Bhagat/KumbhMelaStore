@@ -9,7 +9,7 @@ export function LanguageToggleButton() {
         type="button"
         aria-pressed={locale === 'en'}
         onClick={() => setLocale('en')}
-        className={`h-6 min-w-7 rounded-full px-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${locale === 'en' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        className={`h-6 min-w-7 rounded-full px-1.5 font-medium transition-[color,background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:translate-y-px motion-reduce:transition-none ${locale === 'en' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
       >
         EN
       </button>
@@ -18,7 +18,7 @@ export function LanguageToggleButton() {
         type="button"
         aria-pressed={locale === 'hi'}
         onClick={() => setLocale('hi')}
-        className={`h-6 rounded-full px-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${locale === 'hi' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        className={`h-6 rounded-full px-1.5 font-medium transition-[color,background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:translate-y-px motion-reduce:transition-none ${locale === 'hi' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
       >
         हिन्दी
       </button>

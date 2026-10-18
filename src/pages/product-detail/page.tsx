@@ -175,7 +175,7 @@ export function Component() {
                     aria-label={`View image ${image.sortOrder + 1} of ${productName}`}
                     aria-pressed={selectedImage?.id === image.id}
                     onClick={() => setSelectedImageId(image.id)}
-                    className={`overflow-hidden rounded-[var(--radius-field)] border ${selectedImage?.id === image.id ? 'border-primary ring-2 ring-primary/30' : 'border-border'}`}
+                    className={`overflow-hidden rounded-[var(--radius-field)] border transition-[border-color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px motion-reduce:transform-none motion-reduce:transition-none ${selectedImage?.id === image.id ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:-translate-y-px hover:border-primary/55 hover:shadow-[var(--shadow-soft)]'}`}
                   >
                     <div className="aspect-square">
                       <CloudinaryImage
@@ -248,7 +248,7 @@ export function Component() {
                             setQuantity(1)
                           }}
                           disabled={!inStock}
-                          className={`flex items-center justify-between gap-3 rounded-[var(--radius-field)] border p-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50 ${selectedVariant?.id === variant.id ? 'border-primary bg-primary/5' : 'border-border'}`}
+                          className={`flex items-center justify-between gap-3 rounded-[var(--radius-field)] border p-3 text-left text-sm transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none motion-reduce:transition-none ${selectedVariant?.id === variant.id ? 'border-primary bg-primary/5' : 'border-border hover:-translate-y-px hover:border-primary/55 hover:bg-muted/60 hover:shadow-[var(--shadow-soft)]'}`}
                         >
                           <span>{variant.title}</span>
                           <span>{formatCurrency(Number(variant.price), product.currency)}</span>
