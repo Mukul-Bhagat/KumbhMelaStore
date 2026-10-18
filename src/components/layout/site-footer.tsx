@@ -85,6 +85,11 @@ export function SiteFooter() {
               {description}
             </p>
             <div className="flex flex-wrap gap-3">
+              <Button asChild className="border-[#b78338] bg-[#d6a654] text-[#38220f] hover:border-[#9b6728] hover:bg-[#e4bd70]">
+                <Link to={routes.products}>
+                  {t('footer.explore_products', isHindi ? 'उत्पाद देखें' : 'Explore Products')}
+                </Link>
+              </Button>
               <Button asChild variant="outline" className="border-[#8d6236] bg-[#fff7e7]/85 text-[#2a211a] hover:border-[#6d4524] hover:bg-[#fff1d7]">
                 <Link to={routes.contact}>
                   {t('footer.talk_to_us', isHindi ? 'हमसे संपर्क करें' : 'Talk to us')}
