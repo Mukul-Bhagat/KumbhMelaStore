@@ -10,7 +10,11 @@ import {
 } from 'react'
 import type { Provider, Session } from '@supabase/supabase-js'
 
-import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/shared/api/supabase'
+import {
+  getCanonicalAuthRedirectUrl,
+  getSupabaseBrowserClient,
+  isSupabaseConfigured,
+} from '@/shared/api/supabase'
 import { getAlternateLocale, type Locale } from '@/shared/config/locales'
 import type { AuthProfile, AuthState, AppRole } from '@/shared/auth/types'
 import { fetchAuthProfile } from '@/shared/auth/repository'
@@ -202,7 +206,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       signUpWithPassword: async ({ email, password, fullName, phone, locale }) => {
         const supabase = getSupabaseBrowserClient()
-        const callbackUrl = `${window.location.origin}/auth/callback?locale=${locale}`
+        const callbackUrl = getCanonicalAuthRedirectUrl('/auth/callback', locale)
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -231,7 +235,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            redirectTo: `${window.location.origin}/auth/callback?locale=${locale}`,
+            redirectTo: getCanonicalAuthRedirectUrl('/auth/callback', locale),
           },
         })
         if (error) {
@@ -242,7 +246,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const supabase = getSupabaseBrowserClient()
         const locale = getActiveLocale()
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/reset-password?locale=${locale}`,
+          redirectTo: getCanonicalAuthRedirectUrl('/auth/reset-password', locale),
         })
         if (error) {
           throw error

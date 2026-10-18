@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Lock, Mail } from 'lucide-react'
+import { LoaderCircle, Lock, Mail } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -24,6 +24,7 @@ export function SignInForm() {
   const { t } = useTranslate()
   const githubEnabled = isGithubOAuthEnabled()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [submitInFlight, setSubmitInFlight] = useState(false)
 
   const redirectTo = useMemo(() => {
     const state = location.state as { from?: string } | null
@@ -40,6 +41,11 @@ export function SignInForm() {
   })
 
   const onSubmit = form.handleSubmit(async (values) => {
+    if (submitInFlight) {
+      return
+    }
+
+    setSubmitInFlight(true)
     setErrorMessage(null)
 
     try {
@@ -53,7 +59,38 @@ export function SignInForm() {
         { replace: true },
       )
     } catch (error) {
-      const message = error instanceof Error ? error.message : ''
+      const details = getAuthErrorDetails(error)
+      const message = details.message ?? (error instanceof Error ? error.message : '')
+
+      if (
+        details.status === 429 ||
+        details.code === 'over_request_rate_limit' ||
+        details.code === 'over_email_send_rate_limit' ||
+        details.message?.toLowerCase().includes('too many requests')
+      ) {
+        setErrorMessage(
+          t(
+            'auth.sign_in.rate_limit',
+            'Too many sign-in attempts were made. Please wait a minute and try again.',
+          ),
+        )
+        return
+      }
+
+      if (details.code === 'invalid_credentials') {
+        setErrorMessage(
+          t('auth.sign_in.invalid_credentials', 'Incorrect email or password. Please try again.'),
+        )
+        return
+      }
+
+      if (details.code === 'email_not_confirmed') {
+        setErrorMessage(
+          t('auth.sign_in.email_not_confirmed', 'Please confirm your email address before signing in.'),
+        )
+        return
+      }
+
       setErrorMessage(
         error instanceof TypeError ||
           error instanceof DOMException && error.name === 'TimeoutError' ||
@@ -64,11 +101,13 @@ export function SignInForm() {
             )
           : message || t('auth.sign_in.error', 'Unable to sign in. Please try again.'),
       )
+    } finally {
+      setSubmitInFlight(false)
     }
   })
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 p-6 sm:p-8">
+    <form onSubmit={onSubmit} className="space-y-6 p-6 sm:p-8" noValidate>
       <div className="space-y-2">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
           {t('auth.sign_in.title', 'Welcome back')}
@@ -134,14 +173,25 @@ export function SignInForm() {
       </label>
 
       <div className="space-y-3">
-        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-          {t('auth.sign_in.cta', 'Sign in')}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting || submitInFlight}
+        >
+          {form.formState.isSubmitting || submitInFlight ? (
+            <>
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {t('auth.sign_in.pending', 'Signing in...')}
+            </>
+          ) : (
+            t('auth.sign_in.cta', 'Sign in')
+          )}
         </Button>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Button
             type="button"
-            variant="outline"
+            variant="default"
             className="w-full"
             onClick={() => {
               void auth.signInWithOAuth('google')
@@ -174,4 +224,17 @@ export function SignInForm() {
       </div>
     </form>
   )
+}
+
+function getAuthErrorDetails(error: unknown) {
+  if (typeof error !== 'object' || error === null) {
+    return { status: undefined, code: undefined, message: undefined }
+  }
+
+  const details = error as { status?: unknown; code?: unknown; message?: unknown }
+  return {
+    status: typeof details.status === 'number' ? details.status : undefined,
+    code: typeof details.code === 'string' ? details.code : undefined,
+    message: typeof details.message === 'string' ? details.message : undefined,
+  }
 }

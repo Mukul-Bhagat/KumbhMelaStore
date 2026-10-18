@@ -15,6 +15,12 @@ export function Component() {
   const [searchParams] = useSearchParams()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  const callbackErrorMessage = (() => {
+    const authError = searchParams.get('error')
+    const authErrorDescription = searchParams.get('error_description')
+    return authErrorDescription ?? authError ?? null
+  })()
+
   useEffect(() => {
     const localeParam = searchParams.get('locale')
     if (isLocale(localeParam)) {
@@ -29,6 +35,10 @@ export function Component() {
     const code = searchParams.get('code')
 
     if (!code) {
+      if (callbackErrorMessage) {
+        return
+      }
+
       navigate(routes.dashboard.home, { replace: true })
       return
     }
@@ -61,14 +71,14 @@ export function Component() {
     return () => {
       mounted = false
     }
-  }, [navigate, searchParams])
+  }, [callbackErrorMessage, navigate, searchParams])
 
-  if (errorMessage) {
+  if (errorMessage || callbackErrorMessage) {
     return (
       <div className="grid min-h-screen place-items-center px-4 py-10">
         <ErrorState
           title="Unable to complete sign-in"
-          description={errorMessage}
+          description={errorMessage ?? callbackErrorMessage ?? 'Unable to complete sign-in.'}
           retryLabel="Return to sign in"
           onRetry={() => navigate(routes.auth.signIn, { replace: true })}
           className="w-full max-w-2xl"

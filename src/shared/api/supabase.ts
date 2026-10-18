@@ -46,6 +46,23 @@ export function consumeSignupRetryAfterSeconds() {
   return retryAfterSeconds
 }
 
+export function getCanonicalAuthRedirectUrl(pathname = '/auth/callback', locale?: string) {
+  const baseUrl = (
+    import.meta.env.VITE_SITE_URL?.trim() ||
+    (typeof window !== 'undefined' ? window.location.origin : '') ||
+    'https://kumbhmelastore.in'
+  ).trim()
+
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
+  const url = new URL(normalizedPath, baseUrl)
+
+  if (locale) {
+    url.searchParams.set('locale', locale)
+  }
+
+  return url.toString()
+}
+
 export function isSupabaseConfigured() {
   return hasRequiredEnv()
 }
