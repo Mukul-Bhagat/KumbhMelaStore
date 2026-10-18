@@ -10,11 +10,6 @@ import { site } from '@/shared/config/site'
 import { resolveLocalizedHref } from '@/shared/lib/navigation'
 import { LanguageToggleButton } from './language-toggle'
 
-const socialLinks = [
-  { label: 'Email', href: `mailto:${site.supportEmail}`, icon: Mail },
-  { label: 'Website', href: site.url, icon: Globe },
-]
-
 export function SiteFooter() {
   const { t, locale } = useTranslate()
   const shell = useSiteShell()
@@ -26,6 +21,10 @@ export function SiteFooter() {
     : site.description
   const supportEmail = shell.data?.brand.supportEmail ?? site.supportEmail
   const url = shell.data?.brand.url ?? site.url
+  const socialLinks = [
+    { label: 'Email', href: `mailto:${supportEmail}`, icon: Mail },
+    { label: 'Website', href: url, icon: Globe },
+  ]
   const footerSections: CmsFooterSection[] = shell.data?.footer.sections.length
     ? shell.data.footer.sections
     : [
@@ -69,31 +68,31 @@ export function SiteFooter() {
       ]
 
   return (
-    <footer className="relative mt-8 overflow-hidden border-t border-[#d7b670]/80 bg-[#f6efe7] text-[#2a211a]">
-      <div className="absolute inset-x-0 bottom-0 h-[210px]">
+    <footer className="relative mt-8 overflow-hidden border-t border-[#d7b670]/90 text-[#2a211a]">
+      <div className="absolute inset-0">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-          style={{ backgroundImage: `url('${site.footerBackgroundUrl}')`, backgroundPosition: 'center bottom' }}
+          className="absolute inset-0 bg-cover bg-[position:58%_center] bg-no-repeat sm:bg-center"
+          style={{ backgroundImage: `url('${site.footerBackgroundUrl}')` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#f6efe7]/85 via-[#f6efe7]/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#f8efd9]/72 via-[#f7e9cc]/50 to-[#f6e5c3]/70" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-4 pb-5 pt-8 sm:px-6 lg:px-10">
-        <div className="grid gap-6 xl:grid-cols-[1.25fr_0.8fr_0.8fr_0.8fr_0.9fr]">
+      <div className="relative mx-auto w-full max-w-[1600px] px-4 py-10 sm:px-6 sm:py-12 lg:px-10 lg:py-14">
+        <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[1.25fr_0.8fr_0.8fr_0.8fr_0.9fr]">
           <div className="space-y-4 xl:pr-6">
             <BrandMark linked size="md" className="inline-flex" />
-            <p className="max-w-lg text-sm leading-7 text-[#3a2d26] sm:text-base">
+            <p className="max-w-lg text-sm leading-7 text-[#34241a] sm:text-base">
               {description}
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="border border-[#d3ad5d] bg-[#d9b26f] text-[#1e1712] hover:bg-[#e1ba76]">
+              <Button asChild className="border-[#6d4524] bg-[#6d4524] text-[#fff7e7] hover:border-[#4d2e19] hover:bg-[#4d2e19]">
                 <Link to={routes.collections}>
                   {t('footer.explore_collections', isHindi ? 'संग्रह देखें' : 'Explore Collections')}
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border border-[#d3ad5d] bg-[#f6efe7] text-[#2a211a] hover:bg-[#f3e6cc]">
+              <Button asChild variant="outline" className="border-[#8d6236] bg-[#fff7e7]/85 text-[#2a211a] hover:border-[#6d4524] hover:bg-[#fff1d7]">
                 <Link to={routes.contact}>
-                  {t('footer.contact_studio', isHindi ? 'हमसे संपर्क करें' : 'Get in touch')}
+                  {t('footer.talk_to_us', isHindi ? 'हमसे संपर्क करें' : 'Talk to us')}
                 </Link>
               </Button>
             </div>
@@ -105,7 +104,7 @@ export function SiteFooter() {
                   href={href}
                   target={href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:') ? '_blank' : undefined}
                   rel={href.startsWith('http') ? 'noreferrer' : undefined}
-                  className="inline-flex items-center gap-2 rounded-full border border-[#d3ad5d] bg-[#f9f4ea] px-3 py-2 text-[11px] font-medium text-[#2f261f] transition-colors hover:bg-[#f1e0bb]"
+                  className="inline-flex items-center gap-2 rounded-full border border-[#a87840] bg-[#fff7e7]/82 px-3 py-2 text-[11px] font-medium text-[#2f261f] shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#6d4524] hover:bg-[#fff1d7] hover:shadow-[var(--shadow-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7e9cc] active:translate-y-px"
                   aria-label={label}
                 >
                   <Icon className="h-3.5 w-3.5 text-[#7b5731]" />
@@ -118,7 +117,7 @@ export function SiteFooter() {
           {footerSections.map((section) => (
             <div key={section.sectionKey} className="space-y-3">
               <div className="flex items-center gap-3">
-                <h3 className="text-[0.8rem] font-medium uppercase tracking-[0.18em] text-[#472f1f]">
+                <h3 className="text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-[#3e2618]">
                   {t(
                     section.titleKey,
                     isHindi
@@ -134,10 +133,10 @@ export function SiteFooter() {
                           : 'Shop',
                   )}
                 </h3>
-                <span className="h-px flex-1 bg-[#d3ad5d]/70" />
+                <span className="h-px flex-1 bg-[#a87840]/80" />
               </div>
 
-              <ul className="space-y-2.5 text-sm text-[#3b2f2a]">
+              <ul className="space-y-2.5 text-sm text-[#34241a]">
                 {section.links.map((link) => {
                   const external =
                     link.href.startsWith('http://') ||
@@ -152,7 +151,7 @@ export function SiteFooter() {
                           href={link.href}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-2 transition-colors hover:text-[#4c3528]"
+                          className="inline-flex items-center gap-2 rounded-sm transition-[color,transform] duration-200 hover:translate-x-0.5 hover:text-[#6d4524] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524]"
                         >
                           <ArrowUpRight className="h-3.5 w-3.5 text-[#b88942]" />
                           <span>{t(link.labelKey, footerLabelFallback(link.labelKey, locale))}</span>
@@ -160,7 +159,7 @@ export function SiteFooter() {
                       ) : (
                         <Link
                           to={resolveLocalizedHref(link.href, locale)}
-                          className="inline-flex items-center gap-2 transition-colors hover:text-[#4c3528]"
+                          className="inline-flex items-center gap-2 rounded-sm transition-[color,transform] duration-200 hover:translate-x-0.5 hover:text-[#6d4524] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524]"
                         >
                           <ArrowUpRight className="h-3.5 w-3.5 text-[#b88942]" />
                           <span>{t(link.labelKey, footerLabelFallback(link.labelKey, locale))}</span>
@@ -175,26 +174,26 @@ export function SiteFooter() {
 
           <div className="space-y-3 xl:pl-2">
             <div className="flex items-center gap-3">
-              <h3 className="text-[0.8rem] font-medium uppercase tracking-[0.18em] text-[#472f1f]">
+              <h3 className="text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-[#3e2618]">
                 {t('footer.contact', isHindi ? 'संपर्क' : 'Get in touch')}
               </h3>
-              <span className="h-px flex-1 bg-[#d3ad5d]/70" />
+              <span className="h-px flex-1 bg-[#a87840]/80" />
             </div>
-            <div className="space-y-3 text-sm text-[#3b2f2a]">
-              <a href={url} className="flex items-center gap-3 transition-colors hover:text-[#4c3528]" target="_blank" rel="noreferrer">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d3ad5d] bg-[#f9f4ea]">
+            <div className="space-y-3 text-sm text-[#34241a]">
+              <a href={url} className="flex items-center gap-3 rounded-sm transition-[color,transform] duration-200 hover:translate-x-0.5 hover:text-[#6d4524] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524]" target="_blank" rel="noreferrer">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#a87840] bg-[#fff7e7]/82">
                   <Globe className="h-3.5 w-3.5 text-[#7b5731]" />
                 </span>
                 <span>{url}</span>
               </a>
-              <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 transition-colors hover:text-[#4c3528]">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d3ad5d] bg-[#f9f4ea]">
+              <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 rounded-sm transition-[color,transform] duration-200 hover:translate-x-0.5 hover:text-[#6d4524] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524]">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#a87840] bg-[#fff7e7]/82">
                   <Mail className="h-3.5 w-3.5 text-[#7b5731]" />
                 </span>
                 <span>{supportEmail}</span>
               </a>
-              <a href="tel:+918180891464" className="flex items-center gap-3 transition-colors hover:text-[#4c3528]">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d3ad5d] bg-[#f9f4ea]">
+              <a href="tel:+918180891464" className="flex items-center gap-3 rounded-sm transition-[color,transform] duration-200 hover:translate-x-0.5 hover:text-[#6d4524] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4524]">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#a87840] bg-[#fff7e7]/82">
                   <Mail className="h-3.5 w-3.5 text-[#7b5731]" />
                 </span>
                 <span>+91 81808 91464</span>
@@ -203,8 +202,8 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="relative mt-6 border-t border-[#d3ad5d]/70 pt-4">
-          <div className="flex flex-col gap-3 text-sm text-[#3b2f2a] sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative mt-10 border-t border-[#a87840]/80 pt-5">
+          <div className="flex flex-col gap-3 text-sm text-[#34241a] sm:flex-row sm:items-center sm:justify-between">
             <p>
               © {new Date().getFullYear()} {brandName}. {t('footer.rights', isHindi ? 'सर्वाधिकार सुरक्षित।' : 'All rights reserved.')}
             </p>
