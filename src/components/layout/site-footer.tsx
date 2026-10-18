@@ -1,4 +1,4 @@
-import { ArrowUpRight, Camera, Globe, Mail, Phone } from 'lucide-react'
+import { ArrowUpRight, Globe, Mail } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { BrandMark } from '@/components/brand/brand-mark'
@@ -10,9 +10,7 @@ import { site } from '@/shared/config/site'
 import { resolveLocalizedHref } from '@/shared/lib/navigation'
 
 const socialLinks = [
-  { label: 'Instagram', href: 'https://instagram.com', icon: Camera },
-  { label: 'Email', href: 'mailto:hello@kumbhmelastore.in', icon: Mail },
-  { label: 'Contact', href: 'tel:+919999999999', icon: Phone },
+  { label: 'Email', href: `mailto:${site.supportEmail}`, icon: Mail },
   { label: 'Website', href: site.url, icon: Globe },
 ]
 
@@ -64,6 +62,7 @@ export function SiteFooter() {
             { id: 'terms', labelKey: 'footer.terms', href: routes.terms, routeType: 'internal', sortOrder: 2 },
             { id: 'shipping', labelKey: 'footer.shipping', href: routes.shippingPolicy, routeType: 'internal', sortOrder: 3 },
             { id: 'refund', labelKey: 'footer.refund', href: routes.refundPolicy, routeType: 'internal', sortOrder: 4 },
+            { id: 'cancellation', labelKey: 'footer.cancellation', href: routes.cancellationPolicy, routeType: 'internal', sortOrder: 5 },
           ],
         },
       ]
@@ -193,11 +192,11 @@ export function SiteFooter() {
                 </span>
                 <span>{supportEmail}</span>
               </a>
-              <a href="tel:+919999999999" className="flex items-center gap-3 transition-colors hover:text-[#4c3528]">
+              <a href="tel:+918180891464" className="flex items-center gap-3 transition-colors hover:text-[#4c3528]">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d3ad5d] bg-[#f9f4ea]">
-                  <Phone className="h-3.5 w-3.5 text-[#7b5731]" />
+                  <Mail className="h-3.5 w-3.5 text-[#7b5731]" />
                 </span>
-                <span>+91 99999 99999</span>
+                <span>+91 81808 91464</span>
               </a>
             </div>
           </div>
@@ -230,6 +229,7 @@ function footerLabelFallback(key: string, locale: 'hi' | 'en') {
       'footer.terms': 'Terms & Conditions',
       'footer.shipping': 'Shipping policy',
       'footer.refund': 'Refund policy',
+      'footer.cancellation': 'Cancellation policy',
     },
     hi: {
       'nav.about': 'हमारे बारे में',
@@ -244,6 +244,7 @@ function footerLabelFallback(key: string, locale: 'hi' | 'en') {
       'footer.terms': 'नियम और शर्तें',
       'footer.shipping': 'शिपिंग नीति',
       'footer.refund': 'रिफंड नीति',
+      'footer.cancellation': 'रद्दीकरण नीति',
     },
   }
 

@@ -57,16 +57,19 @@ export const routes = {
     return localized('track-order')
   },
   get privacyPolicy() {
-    return localized('privacy-policy')
+    return '/privacy-policy'
   },
   get terms() {
-    return localized('terms')
+    return '/terms-and-conditions'
   },
   get refundPolicy() {
-    return localized('refund-policy')
+    return '/refund-policy'
   },
   get shippingPolicy() {
-    return localized('shipping-policy')
+    return '/shipping-policy'
+  },
+  get cancellationPolicy() {
+    return '/cancellation-policy'
   },
   get faq() {
     return localized('faq')

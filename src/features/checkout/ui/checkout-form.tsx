@@ -223,6 +223,18 @@ export function CheckoutForm() {
         }
       />
 
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <Link to={routes.privacyPolicy} className="underline underline-offset-4 hover:text-foreground">
+          Privacy policy
+        </Link>
+        <Link to={routes.terms} className="underline underline-offset-4 hover:text-foreground">
+          Terms & conditions
+        </Link>
+        <Link to={routes.shippingPolicy} className="underline underline-offset-4 hover:text-foreground">
+          Shipping policy
+        </Link>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="checkout-label">Address label</Label>

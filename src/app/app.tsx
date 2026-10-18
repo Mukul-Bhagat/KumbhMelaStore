@@ -33,6 +33,30 @@ const router = createBrowserRouter([
         element: <IndexRoute />,
       },
       {
+        path: 'privacy-policy',
+        lazy: () => import('@/pages/policies/privacy-policy/page'),
+      },
+      {
+        path: 'terms',
+        lazy: () => import('@/pages/policies/terms/page'),
+      },
+      {
+        path: 'terms-and-conditions',
+        lazy: () => import('@/pages/policies/terms/page'),
+      },
+      {
+        path: 'shipping-policy',
+        lazy: () => import('@/pages/policies/shipping-policy/page'),
+      },
+      {
+        path: 'refund-policy',
+        lazy: () => import('@/pages/policies/refund-policy/page'),
+      },
+      {
+        path: 'cancellation-policy',
+        lazy: () => import('@/pages/policies/cancellation-policy/page'),
+      },
+      {
         path: 'auth/callback',
         lazy: () => import('@/pages/auth/callback/page'),
       },
@@ -112,12 +136,20 @@ const router = createBrowserRouter([
                 lazy: () => import('@/pages/policies/terms/page'),
               },
               {
+                path: 'terms-and-conditions',
+                lazy: () => import('@/pages/policies/terms/page'),
+              },
+              {
                 path: 'refund-policy',
                 lazy: () => import('@/pages/policies/refund-policy/page'),
               },
               {
                 path: 'shipping-policy',
                 lazy: () => import('@/pages/policies/shipping-policy/page'),
+              },
+              {
+                path: 'cancellation-policy',
+                lazy: () => import('@/pages/policies/cancellation-policy/page'),
               },
             ],
           },

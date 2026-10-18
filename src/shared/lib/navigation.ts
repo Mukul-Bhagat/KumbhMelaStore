@@ -14,7 +14,20 @@ export function isNeutralAuthHref(href: string) {
 }
 
 export function resolveLocalizedHref(href: string, locale: Locale) {
+  const rootPolicyPaths = [
+    '/privacy-policy',
+    '/terms-and-conditions',
+    '/terms',
+    '/shipping-policy',
+    '/refund-policy',
+    '/cancellation-policy',
+  ]
+
   if (!href || isExternalHref(href) || isNeutralAuthHref(href) || href.startsWith(`/${locale}`)) {
+    return href
+  }
+
+  if (rootPolicyPaths.includes(href)) {
     return href
   }
 

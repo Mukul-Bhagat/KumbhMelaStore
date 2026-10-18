@@ -1,3 +1,6 @@
-import { createCmsRoutePage } from '@/components/cms/cms-page'
+import { PolicyPage } from '@/components/policies/policy-page'
+import { policyContent } from '@/shared/config/policy-content'
 
-export const Component = createCmsRoutePage('refund-policy')
+export function Component() {
+  return <PolicyPage meta={policyContent.refund} />
+}
