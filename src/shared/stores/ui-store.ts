@@ -3,6 +3,8 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { defaultLocale, type Locale } from '@/shared/config/locales'
 
+export const UI_STORAGE_KEY = 'kumbh-mela-store-ui'
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 interface UiState {
@@ -36,7 +38,7 @@ export const useUiStore = create<UiState>()(
       setSearchOpen: (open) => set({ searchOpen: open }),
     }),
     {
-      name: 'kumbh-mela-store-ui',
+      name: UI_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         theme: state.theme,

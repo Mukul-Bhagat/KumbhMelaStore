@@ -8,6 +8,7 @@ import type { CmsFooterSection } from '@/shared/cms/types'
 import { routes } from '@/shared/config/routes'
 import { site } from '@/shared/config/site'
 import { resolveLocalizedHref } from '@/shared/lib/navigation'
+import { LanguageToggleButton } from './language-toggle'
 
 const socialLinks = [
   { label: 'Email', href: `mailto:${site.supportEmail}`, icon: Mail },
@@ -207,6 +208,7 @@ export function SiteFooter() {
             <p>
               © {new Date().getFullYear()} {brandName}. {t('footer.rights', isHindi ? 'सर्वाधिकार सुरक्षित।' : 'All rights reserved.')}
             </p>
+            <LanguageToggleButton />
           </div>
         </div>
       </div>

@@ -13,12 +13,17 @@ import { CheckoutLayout } from '@/components/layout/checkout-layout'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { AdminLayout } from '@/components/layout/admin-layout'
 import { RequireAuth, RequireRole } from '@/app/route-guards'
-import { normalizeLocale } from '@/shared/config/locales'
-import { useUiStore } from '@/shared/stores/ui-store'
+import { useLocale, useLocaleHydrated } from '@/shared/hooks/use-locale'
 import { Component as HomePage } from '@/pages/home/page'
 
 function IndexRoute() {
-  const locale = useUiStore((state) => normalizeLocale(state.locale))
+  const locale = useLocale()
+  const hydrated = useLocaleHydrated()
+
+  if (!hydrated) {
+    return <InitialRouteFallback />
+  }
+
   return <Navigate replace to={`/${locale}`} />
 }
 

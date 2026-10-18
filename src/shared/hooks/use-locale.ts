@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { getAlternateLocale, normalizeLocale, type Locale } from '@/shared/config/locales'
@@ -9,6 +9,18 @@ import { useUiStore } from '@/shared/stores/ui-store'
 export function useLocale() {
   const locale = useUiStore((state) => state.locale)
   return normalizeLocale(locale)
+}
+
+export function useLocaleHydrated() {
+  const [hydrated, setHydrated] = useState(() => useUiStore.persist.hasHydrated())
+
+  useEffect(() => {
+    const unsubscribe = useUiStore.persist.onFinishHydration(() => setHydrated(true))
+    setHydrated(useUiStore.persist.hasHydrated())
+    return unsubscribe
+  }, [])
+
+  return hydrated
 }
 
 export function useLocaleActions() {

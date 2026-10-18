@@ -6,12 +6,13 @@ import { AuthProvider } from '@/shared/auth/provider'
 import { queryClient } from '@/shared/api/query-client'
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/shared/api/supabase'
 import { queryKeys } from '@/shared/api/keys'
-import { getActiveLocale } from '@/shared/lib/locale-state'
+import { getActiveLocale, setActiveLocale } from '@/shared/lib/locale-state'
 import { readProductContent } from '@/shared/lib/product-content'
 import { useCartStore } from '@/shared/stores/cart-store'
+import { UI_STORAGE_KEY, useUiStore } from '@/shared/stores/ui-store'
 import type { Database } from '@/shared/types/database'
-import { useUiStore } from '@/shared/stores/ui-store'
 import { useMounted } from '@/shared/hooks/use-mounted'
+import { useLocale, useLocaleHydrated } from '@/shared/hooks/use-locale'
 
 type ProductCartRow = Pick<
   Database['public']['Tables']['products']['Row'],
@@ -218,10 +219,48 @@ function ThemeHydrator() {
   return null
 }
 
+function LocalePersistence() {
+  const locale = useLocale()
+  const hydrated = useLocaleHydrated()
+  const setLocale = useUiStore((state) => state.setLocale)
+
+  useEffect(() => {
+    if (hydrated) {
+      setActiveLocale(locale)
+    }
+  }, [hydrated, locale])
+
+  useEffect(() => {
+    const syncLocaleFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== UI_STORAGE_KEY || !event.newValue) {
+        return
+      }
+
+      try {
+        const stored = JSON.parse(event.newValue) as { state?: { locale?: unknown } }
+        if (
+          (stored.state?.locale === 'en' || stored.state?.locale === 'hi') &&
+          useUiStore.getState().locale !== stored.state.locale
+        ) {
+          setLocale(stored.state.locale)
+        }
+      } catch {
+        // Ignore malformed browser storage rather than disrupting the current preference.
+      }
+    }
+
+    window.addEventListener('storage', syncLocaleFromOtherTab)
+    return () => window.removeEventListener('storage', syncLocaleFromOtherTab)
+  }, [setLocale])
+
+  return null
+}
+
 export function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeHydrator />
+      <LocalePersistence />
       <ProductCartSynchronizer />
       <AuthProvider>{children}</AuthProvider>
       <Toaster

@@ -188,23 +188,24 @@ export function SignInForm() {
           )}
         </Button>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col items-center gap-3">
           <Button
             type="button"
-            variant="default"
-            className="w-full"
+            variant="outline"
+            className="h-11 w-full max-w-sm border-border bg-background text-foreground shadow-sm hover:bg-muted"
             onClick={() => {
               void auth.signInWithOAuth('google')
             }}
           >
-            {t('auth.google', 'Continue with Google')}
+            <img src="/google-g-logo.svg" alt="" aria-hidden="true" className="h-[18px] w-[18px]" />
+            {t('auth.google_sign_in', 'Sign in with Google')}
           </Button>
 
           {githubEnabled ? (
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full max-w-sm"
               onClick={() => {
                 void auth.signInWithOAuth('github')
               }}

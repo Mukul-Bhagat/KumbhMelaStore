@@ -10,7 +10,6 @@ import { useLocaleActions } from '@/shared/hooks/use-locale'
 import { useSiteShell, useTranslate } from '@/shared/cms/hooks'
 import { routes } from '@/shared/config/routes'
 import { site } from '@/shared/config/site'
-import { LanguageToggleButton } from './language-toggle'
 import { MobileNav, type MobileNavItem } from './mobile-nav'
 
 export interface SiteHeaderProps {
@@ -135,7 +134,6 @@ export function SiteHeader({ className }: SiteHeaderProps) {
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <LanguageToggleButton />
           <div className="hidden items-center gap-2 xl:flex">
             {desktopAuthButton}
             {cartButton}

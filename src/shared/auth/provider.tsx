@@ -19,7 +19,6 @@ import { getAlternateLocale, type Locale } from '@/shared/config/locales'
 import type { AuthProfile, AuthState, AppRole } from '@/shared/auth/types'
 import { fetchAuthProfile } from '@/shared/auth/repository'
 import { getActiveLocale } from '@/shared/lib/locale-state'
-import { useUiStore } from '@/shared/stores/ui-store'
 
 type AuthContextValue = AuthState & {
   ready: boolean
@@ -60,7 +59,6 @@ function createInitialAuthState(): AuthState {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AuthState>(createInitialAuthState)
   const [ready, setReady] = useState(() => !isSupabaseConfigured())
-  const setLocale = useUiStore((uiState) => uiState.setLocale)
 
   const refresh = useCallback(async () => {
     const supabase = getSupabaseBrowserClient()
@@ -84,14 +82,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setState({ status: 'loading', session, user: session.user, profile: null })
     try {
       const profile = await fetchAuthProfile(session.user)
-      setLocale(profile.localeCode)
       setState({ status: 'authenticated', session, user: session.user, profile })
     } catch (error) {
       console.error('Unable to load the authenticated user profile and roles.', error)
       setState({ status: 'authenticated', session, user: session.user, profile: null })
       throw error
     }
-  }, [setLocale])
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -120,7 +117,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
           return
         }
 
-        setLocale(profile.localeCode)
         setState({ status: 'authenticated', session, user: session.user, profile })
       } catch (error) {
         if (!mounted) {
@@ -175,7 +171,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       mounted = false
       listener.subscription.unsubscribe()
     }
-  }, [setLocale])
+  }, [])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -194,7 +190,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         const profile = await fetchAuthProfile(data.user)
-        setLocale(profile.localeCode)
         setState({
           status: 'authenticated',
           session: data.session,
@@ -268,7 +263,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       refresh,
     }),
-    [ready, refresh, setLocale, state],
+    [ready, refresh, state],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

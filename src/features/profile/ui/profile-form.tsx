@@ -11,6 +11,8 @@ import { Select } from '@/components/ui/select'
 import { useAuth } from '@/shared/auth/provider'
 import { useTranslate } from '@/shared/cms/hooks'
 import { getSupabaseBrowserClient } from '@/shared/api/supabase'
+import { defaultLocale } from '@/shared/config/locales'
+import { useLocaleActions } from '@/shared/hooks/use-locale'
 import { profileSchema, type ProfileValues } from '@/features/profile/model/schema'
 
 const defaultValues: ProfileValues = {
@@ -18,13 +20,14 @@ const defaultValues: ProfileValues = {
   displayName: '',
   email: '',
   phone: '',
-  locale: 'hi',
+  locale: defaultLocale,
   avatarUrl: '',
 }
 
 export function ProfileForm() {
   const auth = useAuth()
   const { t } = useTranslate()
+  const { setLocale } = useLocaleActions()
   const supabase = getSupabaseBrowserClient()
   const [message, setMessage] = useState<string | null>(null)
   const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('success')
@@ -39,7 +42,7 @@ export function ProfileForm() {
       displayName: auth.profile?.displayName ?? '',
       email: auth.user?.email ?? '',
       phone: auth.profile?.phone ?? '',
-      locale: auth.profile?.localeCode ?? 'hi',
+      locale: auth.profile?.localeCode ?? defaultLocale,
       avatarUrl: auth.profile?.avatarUrl ?? '',
     })
   }, [auth.profile, auth.user?.email, form])
@@ -81,6 +84,7 @@ export function ProfileForm() {
       }
 
       await auth.refresh()
+      setLocale(values.locale)
       setMessageVariant('success')
       setMessage(t('dashboard.profile_saved_description', 'Profile saved and synced with Supabase Auth.'))
     } catch (error) {
