@@ -16,7 +16,6 @@ export function useLocaleHydrated() {
 
   useEffect(() => {
     const unsubscribe = useUiStore.persist.onFinishHydration(() => setHydrated(true))
-    setHydrated(useUiStore.persist.hasHydrated())
     return unsubscribe
   }, [])
 

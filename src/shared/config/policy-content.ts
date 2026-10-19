@@ -36,7 +36,7 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
     description:
       'How KumbhMelaStore collects, uses, stores and protects personal information for account, order and support operations.',
     effectiveDate: '18 October 2026',
-    lastUpdated: '18 October 2026',
+    lastUpdated: '19 October 2026',
     sections: [
       {
         heading: '1. Information we collect',
@@ -143,9 +143,10 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
         ],
       },
       {
-        heading: '5. Payment, COD and shipping terms',
+        heading: '5. Manual UPI payment and shipping terms',
         body: [
-          'The current checkout flow in this application supports cash-on-delivery ordering. Payment terms, shipping eligibility, delivery charges and related conditions are shown before a customer confirms the purchase where the app currently provides that information.',
+          'The current checkout flow uses manual UPI payment and does not offer cash on delivery. The order page displays the exact amount and approved UPI receiving details. A payment reference supplied by a customer is only evidence for review; an order is confirmed for processing only after the store verifies receipt in its receiving account.',
+          'Customers should pay the exact amount shown for their order and should not pay again while a transaction is processing. Customers who need assistance should contact support with their order number. The store will never ask for a UPI PIN, bank password or OTP.',
           'Shipping charges, delivery regions and fulfilment conditions are product- or cart-dependent and should be reviewed on the relevant product page, cart summary or checkout page before completion of purchase.',
         ],
       },
@@ -195,7 +196,7 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
     description:
       'Shipping rules, delivery regions, order processing times and product-specific conditions for KumbhMelaStore orders.',
     effectiveDate: '18 October 2026',
-    lastUpdated: '18 October 2026',
+    lastUpdated: '19 October 2026',
     sections: [
       {
         heading: '1. Shipping eligibility and charges',
@@ -229,7 +230,7 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
         heading: '5. Incorrect addresses and failed deliveries',
         body: [
           'Customers must provide a complete and accurate delivery address, including any required pin code, landmark and contact number. If an address is incomplete, incorrect or cannot be accessed, delivery may be delayed or return to origin. KumbhMelaStore may ask the customer to update the address or contact support to resolve the issue.',
-          'Failed delivery attempts due to an unavailability, refusal, incorrect address or non-payment of COD may result in reattempts, additional charges or return-to-origin handling as determined by the carrier and the order conditions.',
+          'Failed delivery attempts due to unavailability, refusal or an incorrect address may result in reattempts, additional charges or return-to-origin handling as determined by the carrier and the order conditions.',
         ],
       },
       {
@@ -256,9 +257,9 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
     slug: 'cancellation-policy',
     title: 'Cancellation Policy',
     description:
-      'How KumbhMelaStore handles cancellation requests for prepaid and cash-on-delivery orders.',
+      'How KumbhMelaStore handles cancellation requests for manual UPI orders.',
     effectiveDate: '18 October 2026',
-    lastUpdated: '18 October 2026',
+    lastUpdated: '19 October 2026',
     sections: [
       {
         heading: '1. How to request cancellation',
@@ -274,9 +275,9 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
         ],
       },
       {
-        heading: '3. Prepaid and COD orders',
+        heading: '3. Manual UPI payment and cancellation',
         body: [
-          'Prepaid orders may be cancelled before dispatch, and the paid amount will be reversed to the original payment method if the cancellation is accepted. Cash-on-delivery orders are normally cancelled before dispatch or delivery is attempted; if the order has already been dispatched, the customer must follow the return or refund process, subject to the actual circumstances.',
+          'An order awaiting manual UPI verification may be cancelled before processing begins. If payment has already been verified, the customer should contact support; any approved refund is recorded only after the store confirms the refund transaction. Cash on delivery is not available.',
         ],
       },
       {
@@ -299,7 +300,7 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
     description:
       'How KumbhMelaStore handles ordinary returns, defective goods and approved refunds or replacements.',
     effectiveDate: '18 October 2026',
-    lastUpdated: '18 October 2026',
+    lastUpdated: '19 October 2026',
     sections: [
       {
         heading: '1. Ordinary change-of-mind returns',
@@ -323,7 +324,7 @@ export const policyContent: Record<'privacy' | 'terms' | 'shipping' | 'cancellat
       {
         heading: '4. Refund processing',
         body: [
-          'Where a refund is approved or legally required, the store will normally process it through the original payment method, unless a lawful alternative is necessary or agreed. Refunds are subject to the payment processor and banking timelines, and the customer should allow time for the financial institution to complete the reversal.',
+          'Where a refund is approved or legally required, the store will normally return it through a documented payment method agreed for the order. A refund is not treated as completed merely because it is requested or initiated; the store records it after confirmation of the actual refund transaction. Banking timelines may still apply.',
         ],
       },
       {

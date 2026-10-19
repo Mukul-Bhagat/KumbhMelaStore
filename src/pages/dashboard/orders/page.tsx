@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Clock3, ReceiptText } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -11,6 +12,7 @@ import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { queryKeys } from '@/shared/api/keys'
 import { getSupabaseBrowserClient } from '@/shared/api/supabase'
 import { useAuth } from '@/shared/auth/provider'
@@ -29,6 +31,7 @@ type DashboardOrder = Pick<
   | 'order_number'
   | 'public_tracking_code'
   | 'status'
+  | 'fulfillment_status'
   | 'payment_status'
   | 'payment_method'
   | 'currency'
@@ -41,12 +44,39 @@ type DashboardOrder = Pick<
   events: OrderEventRow[]
 }
 
+type PaymentInstructions = {
+  orderId: string
+  amount: number
+  currency: string
+  paymentStatus: string
+  fulfillmentStatus: string
+  payment: {
+    merchantName: string
+    upiId: string
+    qrImageUrl: string
+    instructions: string
+    supportContact: string | null
+  } | null
+}
+
+function parsePaymentInstructions(value: unknown): PaymentInstructions | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const details = value as Record<string, unknown>
+  if (typeof details.orderId !== 'string' || typeof details.amount !== 'number' || typeof details.currency !== 'string' || typeof details.paymentStatus !== 'string' || typeof details.fulfillmentStatus !== 'string') return null
+  const paymentValue = details.payment
+  const paymentRecord = paymentValue && typeof paymentValue === 'object' && !Array.isArray(paymentValue) ? paymentValue as Record<string, unknown> : null
+  const payment = paymentRecord?.available === true && typeof paymentRecord.merchantName === 'string' && typeof paymentRecord.upiId === 'string' && typeof paymentRecord.qrImageUrl === 'string' && typeof paymentRecord.instructions === 'string'
+    ? { merchantName: paymentRecord.merchantName, upiId: paymentRecord.upiId, qrImageUrl: paymentRecord.qrImageUrl, instructions: paymentRecord.instructions, supportContact: typeof paymentRecord.supportContact === 'string' ? paymentRecord.supportContact : null }
+    : null
+  return { orderId: details.orderId, amount: details.amount, currency: details.currency, paymentStatus: details.paymentStatus, fulfillmentStatus: details.fulfillmentStatus, payment }
+}
+
 async function fetchDashboardOrders(userId: string): Promise<DashboardOrder[]> {
   const supabase = getSupabaseBrowserClient()
   const { data: orders, error } = await supabase
     .from('orders')
     .select(
-      'id, order_number, public_tracking_code, status, payment_status, payment_method, currency, grand_total, shipping_address_snapshot, tracking_summary, created_at',
+      'id, order_number, public_tracking_code, status, fulfillment_status, payment_status, payment_method, currency, grand_total, shipping_address_snapshot, tracking_summary, created_at',
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -120,11 +150,13 @@ function OrderCard({
   order,
   locale,
   onCancel,
+  onViewPayment,
   cancelling,
 }: {
   order: DashboardOrder
   locale: 'hi' | 'en'
   onCancel: (orderId: string) => void
+  onViewPayment: (orderId: string) => void
   cancelling: boolean
 }) {
   const { t } = useTranslate()
@@ -138,8 +170,9 @@ function OrderCard({
     ].filter(Boolean).join(', '),
   ].filter(Boolean).join(', ')
   const canCancel =
-    ['placed', 'confirmed'].includes(order.status) &&
+    order.fulfillment_status === 'unfulfilled' &&
     ['pending', 'cash_on_delivery'].includes(order.payment_status)
+  const canViewPayment = order.payment_status === 'pending' && order.fulfillment_status !== 'cancelled'
 
   return (
     <Card className="shadow-[var(--shadow-soft)]">
@@ -157,8 +190,8 @@ function OrderCard({
               {formatDate(order.created_at, locale === 'hi' ? 'hi-IN' : 'en-IN')}
             </p>
           </div>
-          <Badge variant={statusVariant(order.status)}>
-            {t(`dashboard.order_status.${order.status}`, order.status.replaceAll('_', ' '))}
+          <Badge variant={statusVariant(order.fulfillment_status)}>
+            {t(`dashboard.order_status.${order.fulfillment_status}`, order.fulfillment_status.replaceAll('_', ' '))}
           </Badge>
         </div>
 
@@ -177,7 +210,7 @@ function OrderCard({
           <div className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{t('dashboard.status', 'Status')}</p>
             <p className="mt-2 font-display text-xl font-semibold">
-              {t(`dashboard.order_status.${order.status}`, order.status.replaceAll('_', ' '))}
+              {t(`dashboard.order_status.${order.fulfillment_status}`, order.fulfillment_status.replaceAll('_', ' '))}
             </p>
           </div>
         </div>
@@ -246,6 +279,11 @@ function OrderCard({
             {cancelling ? 'Cancelling…' : 'Cancel order'}
           </Button>
         ) : null}
+        {canViewPayment ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => onViewPayment(order.id)}>
+            View UPI payment instructions
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -257,6 +295,9 @@ export function Component() {
   const { t } = useTranslate()
   const queryClient = useQueryClient()
   const userId = auth.user?.id ?? ''
+  const [paymentInstructions, setPaymentInstructions] = useState<PaymentInstructions | null>(null)
+  const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false)
+  const [paymentInstructionsError, setPaymentInstructionsError] = useState<string | null>(null)
   const orders = useQuery({
     queryKey: [...queryKeys.dashboard.all, 'orders', userId] as const,
     queryFn: () => fetchDashboardOrders(userId),
@@ -277,6 +318,24 @@ export function Component() {
       toast.success('Order cancelled')
     },
   })
+  const showPaymentInstructions = async (orderId: string) => {
+    setPaymentInstructionsError(null)
+    setPaymentInstructions(null)
+    setPaymentInstructionsOpen(true)
+    const { data, error } = await getSupabaseBrowserClient().rpc('get_order_manual_payment_details', {
+      p_order_id: orderId,
+    })
+    if (error) {
+      setPaymentInstructionsError(error.message)
+      return
+    }
+    const details = parsePaymentInstructions(data)
+    if (!details) {
+      setPaymentInstructionsError('Approved payment instructions are unavailable. Please contact support before paying.')
+      return
+    }
+    setPaymentInstructions(details)
+  }
 
   if (orders.isLoading) {
     return <LoadingScreen className="min-h-[60svh]" />
@@ -323,6 +382,7 @@ export function Component() {
               order={order}
               locale={locale}
               onCancel={(orderId) => cancelOrder.mutate(orderId)}
+              onViewPayment={(orderId) => { void showPaymentInstructions(orderId) }}
               cancelling={cancelOrder.isPending}
             />
           ))}
@@ -354,6 +414,29 @@ export function Component() {
           </Button>
         </CardContent>
       </Card>
+      <Dialog
+        open={paymentInstructionsOpen}
+        onOpenChange={setPaymentInstructionsOpen}
+        title="Manual UPI payment instructions"
+        description="Pay the exact order amount only once. A payment remains pending until the store verifies receipt."
+        size="md"
+      >
+        {paymentInstructionsError ? (
+          <Alert title="Do not make a payment yet" description={paymentInstructionsError} variant="error" />
+        ) : paymentInstructions ? (
+          paymentInstructions.payment ? (
+            <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_10rem]">
+              <div className="space-y-3">
+                <p className="font-display text-2xl font-semibold">{formatCurrency(paymentInstructions.amount, paymentInstructions.currency, locale === 'hi' ? 'hi-IN' : 'en-IN')}</p>
+                <p className="text-sm leading-6 text-muted-foreground">{paymentInstructions.payment.instructions}</p>
+                <div className="rounded-[var(--radius-field)] border border-border p-3 text-sm"><p>{paymentInstructions.payment.merchantName}</p><p className="font-mono font-semibold text-primary">{paymentInstructions.payment.upiId}</p></div>
+                {paymentInstructions.payment.supportContact ? <p className="text-sm text-muted-foreground">Support: {paymentInstructions.payment.supportContact}</p> : null}
+              </div>
+              <img src={paymentInstructions.payment.qrImageUrl} alt={`Approved UPI QR code for ${paymentInstructions.payment.merchantName}`} className="mx-auto h-40 w-40 rounded border border-border bg-white object-contain p-2" referrerPolicy="no-referrer" />
+            </div>
+          ) : <Alert title="Do not make a payment yet" description="This order no longer accepts a manual UPI payment. Contact support if you need assistance." variant="error" />
+        ) : <LoadingScreen className="min-h-40" />}
+      </Dialog>
     </div>
   )
 }

@@ -27,6 +27,70 @@ type PlacedOrder = {
   currency: string
 }
 
+type ManualPaymentConfig = {
+  available: true
+  merchantName: string
+  upiId: string
+  qrImageUrl: string
+  instructions: string
+  supportContact: string | null
+}
+
+type ManualPaymentDetails = {
+  orderId: string
+  orderNumber: string
+  amount: number
+  currency: string
+  paymentStatus: string
+  fulfillmentStatus: string
+  payment: ManualPaymentConfig | null
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function readManualPaymentConfig(value: unknown): ManualPaymentConfig | null {
+  const config = asRecord(value)
+  if (
+    config?.available !== true ||
+    typeof config.merchantName !== 'string' ||
+    typeof config.upiId !== 'string' ||
+    typeof config.qrImageUrl !== 'string' ||
+    typeof config.instructions !== 'string'
+  ) return null
+
+  return {
+    available: true,
+    merchantName: config.merchantName,
+    upiId: config.upiId,
+    qrImageUrl: config.qrImageUrl,
+    instructions: config.instructions,
+    supportContact: typeof config.supportContact === 'string' ? config.supportContact : null,
+  }
+}
+
+function readPaymentDetails(value: unknown): ManualPaymentDetails | null {
+  const details = asRecord(value)
+  if (
+    !details || typeof details.orderId !== 'string' || typeof details.orderNumber !== 'string' ||
+    typeof details.amount !== 'number' || typeof details.currency !== 'string' ||
+    typeof details.paymentStatus !== 'string' || typeof details.fulfillmentStatus !== 'string'
+  ) return null
+
+  return {
+    orderId: details.orderId,
+    orderNumber: details.orderNumber,
+    amount: details.amount,
+    currency: details.currency,
+    paymentStatus: details.paymentStatus,
+    fulfillmentStatus: details.fulfillmentStatus,
+    payment: readManualPaymentConfig(details.payment),
+  }
+}
+
 const defaultValues: CheckoutValues = {
   label: 'Home',
   recipientName: '',
@@ -62,6 +126,13 @@ export function CheckoutForm() {
   const [message, setMessage] = useState<string | null>(null)
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null)
   const [request, setRequest] = useState<{ signature: string; id: string } | null>(null)
+  const [paymentConfig, setPaymentConfig] = useState<ManualPaymentConfig | null>(null)
+  const [paymentConfigLoading, setPaymentConfigLoading] = useState(true)
+  const [paymentConfigError, setPaymentConfigError] = useState<string | null>(null)
+  const [paymentDetails, setPaymentDetails] = useState<ManualPaymentDetails | null>(null)
+  const [transactionReference, setTransactionReference] = useState('')
+  const [referenceMessage, setReferenceMessage] = useState<string | null>(null)
+  const [submittingReference, setSubmittingReference] = useState(false)
 
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
@@ -83,6 +154,30 @@ export function CheckoutForm() {
     })
   }, [auth.profile, auth.user?.email, form])
 
+  useEffect(() => {
+    let active = true
+    if (!auth.user) return () => { active = false }
+
+    const loadPaymentConfig = async () => {
+      const { data, error } = await supabase.rpc('get_manual_upi_payment_config')
+      if (!active) return
+      if (error) {
+        setPaymentConfig(null)
+        setPaymentConfigError('Manual UPI payment is currently unavailable. Please contact support.')
+      } else {
+        const config = readManualPaymentConfig(data)
+        setPaymentConfig(config)
+        setPaymentConfigError(config ? null : 'Manual UPI payment is currently unavailable. Please contact support.')
+      }
+      setPaymentConfigLoading(false)
+    }
+    void loadPaymentConfig()
+
+    return () => {
+      active = false
+    }
+  }, [auth.user, supabase])
+
   const onSubmit = form.handleSubmit(async (values) => {
     setMessage(null)
 
@@ -96,6 +191,9 @@ export function CheckoutForm() {
       }
       if (unavailableItems.length > 0) {
         throw new Error('One or more products are unavailable or exceed current stock. Review your cart and try again.')
+      }
+      if (!paymentConfig) {
+        throw new Error('Manual UPI payment is currently unavailable. Please contact support.')
       }
 
       const cartItems = items.map((item) => ({
@@ -137,37 +235,112 @@ export function CheckoutForm() {
         throw new Error('Supabase did not return the order confirmation.')
       }
 
+      const { data: detailsData, error: detailsError } = await supabase.rpc('get_order_manual_payment_details', {
+        p_order_id: order.order_id,
+      })
+      if (detailsError) {
+        throw new Error('Order was created, but payment instructions could not be loaded. Open your orders and contact support if this continues.')
+      }
+      const details = readPaymentDetails(detailsData)
+      if (!details) {
+        throw new Error('Order was created, but approved payment instructions are unavailable. Please contact support before paying.')
+      }
+
       if (checkoutNowItem) {
         finishCheckoutNow()
       } else {
         clearCart()
       }
       setPlacedOrder(order)
+      setPaymentDetails(details)
       setRequest(null)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to place your order.')
     }
   })
 
+  const submitPaymentReference = async () => {
+    if (!placedOrder) return
+    setReferenceMessage(null)
+    setSubmittingReference(true)
+    try {
+      const { error } = await supabase.rpc('submit_manual_upi_reference', {
+        p_order_id: placedOrder.order_id,
+        p_transaction_reference: transactionReference,
+        p_note: null,
+      })
+      if (error) throw error
+      setReferenceMessage('Reference submitted for review. This does not confirm payment.')
+      setTransactionReference('')
+    } catch (error) {
+      setReferenceMessage(error instanceof Error ? error.message : 'Unable to submit the payment reference.')
+    } finally {
+      setSubmittingReference(false)
+    }
+  }
+
   if (placedOrder) {
+    const payment = paymentDetails?.payment ?? null
     return (
       <div className="space-y-6">
         <Alert
-          title="Order placed"
+          title="Order created — payment verification pending"
           description={
             <div className="space-y-2">
               <p>
-                Order <strong>{placedOrder.order_number}</strong> has been placed for{' '}
+                Order <strong>{placedOrder.order_number}</strong> was created for{' '}
                 <strong>{formatCurrency(placedOrder.grand_total, placedOrder.currency)}</strong>.
-                Payment is cash on delivery.
+                It is not confirmed until payment receipt is verified.
               </p>
               <p>Keep tracking code {placedOrder.public_tracking_code} for shipment lookup.</p>
             </div>
           }
-          variant="success"
+          variant="warning"
         />
+        {payment ? (
+          <section className="grid gap-6 rounded-[var(--radius-card)] border border-primary/30 bg-primary/5 p-5 sm:grid-cols-[minmax(0,1fr)_12rem] sm:p-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Manual UPI payment</p>
+                <h2 className="mt-1 font-display text-3xl font-semibold">Pay {formatCurrency(paymentDetails?.amount ?? placedOrder.grand_total, paymentDetails?.currency ?? placedOrder.currency)}</h2>
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">{payment.instructions}</p>
+              <div className="rounded-[var(--radius-field)] border border-border bg-background p-4 text-sm">
+                <p className="text-muted-foreground">Pay to</p>
+                <p className="mt-1 font-semibold">{payment.merchantName}</p>
+                <p className="font-mono text-base text-primary">{payment.upiId}</p>
+              </div>
+              {payment.supportContact ? <p className="text-sm text-muted-foreground">Support: {payment.supportContact}</p> : null}
+            </div>
+            <img
+              src={payment.qrImageUrl}
+              alt={`Approved UPI QR code for ${payment.merchantName}`}
+              className="mx-auto h-48 w-48 rounded-[var(--radius-field)] border border-border bg-white object-contain p-2"
+              referrerPolicy="no-referrer"
+            />
+            <div className="space-y-3 sm:col-span-2">
+              <Label htmlFor="payment-reference">Transaction reference (optional)</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="payment-reference"
+                  value={transactionReference}
+                  onChange={(event) => setTransactionReference(event.target.value)}
+                  placeholder="UPI transaction ID / UTR"
+                  maxLength={128}
+                />
+                <Button type="button" variant="outline" onClick={() => void submitPaymentReference()} disabled={submittingReference || transactionReference.trim().length < 4}>
+                  {submittingReference ? 'Submitting…' : 'Submit for review'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">A reference helps support review, but it never confirms payment by itself.</p>
+              {referenceMessage ? <p className="text-sm text-muted-foreground" role="status">{referenceMessage}</p> : null}
+            </div>
+          </section>
+        ) : (
+          <Alert title="Do not make a payment yet" description="Approved UPI payment instructions are unavailable for this order. Contact support before making any payment." variant="error" />
+        )}
         <Button asChild>
-          <Link to={routes.dashboard.orders}>View your orders</Link>
+          <Link to={routes.dashboard.orders}>View order status and payment instructions</Link>
         </Button>
       </div>
     )
@@ -177,8 +350,14 @@ export function CheckoutForm() {
     <form onSubmit={onSubmit} className="space-y-6">
       <Alert
         title="Authenticated account"
-        description={`Your order will be placed for ${auth.user?.email ?? 'your account'} with cash on delivery.`}
+        description={`Your order will be created for ${auth.user?.email ?? 'your account'} and will remain pending until manual UPI payment is verified.`}
       />
+
+      {paymentConfigLoading ? (
+        <Alert title="Checking payment availability" description="Loading the approved payment destination…" />
+      ) : paymentConfigError ? (
+        <Alert title="Payment currently unavailable" description={paymentConfigError} variant="error" />
+      ) : null}
 
       {message ? (
         <Alert
@@ -341,7 +520,7 @@ export function CheckoutForm() {
         <Button
           type="submit"
           className="w-full sm:w-auto"
-          disabled={form.formState.isSubmitting || items.length === 0 || unavailableItems.length > 0}
+          disabled={form.formState.isSubmitting || paymentConfigLoading || !paymentConfig || items.length === 0 || unavailableItems.length > 0}
         >
         {form.formState.isSubmitting ? (
           <span className="inline-flex items-center gap-2">
@@ -349,7 +528,7 @@ export function CheckoutForm() {
             Placing order
           </span>
         ) : (
-          'Place order · Cash on delivery'
+          'Create order & view UPI instructions'
         )}
         </Button>
         <Button asChild variant="outline">

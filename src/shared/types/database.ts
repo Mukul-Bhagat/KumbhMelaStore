@@ -446,11 +446,26 @@ type Order = {
   id: string
   user_id: string
   checkout_request_id: string | null
+  checkout_request_fingerprint: string | null
+  payment_due_at: string | null
   order_number: string
   public_tracking_code: string
   status: 'draft' | 'placed' | 'confirmed' | 'packed' | 'in_transit' | 'delivered' | 'cancelled'
+  fulfillment_status: 'unfulfilled' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'cash_on_delivery'
   payment_method: 'upi' | 'card' | 'net_banking' | 'cod' | 'wallet' | 'manual'
+  payment_provider: string | null
+  payment_verified_at: string | null
+  payment_verified_by: string | null
+  payment_transaction_reference: string | null
+  payment_received_amount: number | null
+  payment_received_currency: string | null
+  refund_status: 'not_requested' | 'requested' | 'initiated' | 'confirmed' | 'failed'
+  refunded_amount: number
+  refund_transaction_reference: string | null
+  refunded_at: string | null
+  refunded_by: string | null
+  inventory_released_at: string | null
   currency: string
   subtotal: number
   discount_total: number
@@ -495,6 +510,27 @@ type OrderStatusEvent = {
   metadata: Json | null
   created_at: string
   updated_at: string
+}
+
+type OrderAuditEvent = {
+  id: string
+  order_id: string
+  actor_id: string | null
+  action: string
+  before_state: Json | null
+  after_state: Json | null
+  transaction_reference: string | null
+  metadata: Json
+  created_at: string
+}
+
+type OrderPaymentSubmission = {
+  id: string
+  order_id: string
+  user_id: string
+  transaction_reference: string
+  note: string | null
+  created_at: string
 }
 
 type SiteContent = {
@@ -577,6 +613,16 @@ export interface Database {
         Partial<OrderStatusEvent>,
         Partial<OrderStatusEvent>
       >
+      order_audit_events: TableShape<
+        OrderAuditEvent,
+        Partial<OrderAuditEvent>,
+        Partial<OrderAuditEvent>
+      >
+      order_payment_submissions: TableShape<
+        OrderPaymentSubmission,
+        Partial<OrderPaymentSubmission>,
+        Partial<OrderPaymentSubmission>
+      >
       site_content: TableShape<SiteContent, Partial<SiteContent>, Partial<SiteContent>>
     }
     Views: Record<string, never>
@@ -616,14 +662,49 @@ export interface Database {
         Args: { p_order_id: string }
         Returns: undefined
       }
-      admin_update_order: {
+      get_manual_upi_payment_config: {
+        Args: Record<string, never>
+        Returns: Json
+      }
+      get_order_manual_payment_details: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      submit_manual_upi_reference: {
+        Args: { p_order_id: string; p_transaction_reference: string; p_note?: string | null }
+        Returns: undefined
+      }
+      admin_verify_manual_upi_payment: {
         Args: {
           p_order_id: string
-          p_status: Database['public']['Enums']['order_status']
-          p_payment_status: Database['public']['Enums']['payment_status']
-          p_tracking_summary: Json | null
+          p_received_amount: number
+          p_received_currency: string
+          p_transaction_reference: string
+          p_confirmed_against_account: boolean
         }
         Returns: undefined
+      }
+      admin_update_order_fulfillment: {
+        Args: {
+          p_order_id: string
+          p_fulfillment_status: Database['public']['Enums']['fulfillment_status']
+          p_tracking_summary?: Json | null
+        }
+        Returns: undefined
+      }
+      admin_record_manual_refund: {
+        Args: {
+          p_order_id: string
+          p_refunded_amount: number
+          p_currency: string
+          p_transaction_reference: string
+          p_confirmed_against_account: boolean
+        }
+        Returns: undefined
+      }
+      expire_pending_manual_upi_orders: {
+        Args: { p_limit?: number }
+        Returns: number
       }
       admin_save_product: {
         Args: {
@@ -660,6 +741,7 @@ export interface Database {
       role_slug: 'customer' | 'super_admin' | 'admin' | 'vendor'
       order_status: 'draft' | 'placed' | 'confirmed' | 'packed' | 'in_transit' | 'delivered' | 'cancelled'
       payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'cash_on_delivery'
+      fulfillment_status: 'unfulfilled' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
     }
     CompositeTypes: Record<string, never>
   }
