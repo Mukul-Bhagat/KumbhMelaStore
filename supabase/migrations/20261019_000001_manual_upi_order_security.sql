@@ -120,7 +120,7 @@ values (
   'payments.manual_upi',
   '{
     "mode": "manual_upi",
-    "enabled": false,
+    "enabled": true,
     "merchant_name": "Kumbh Mela Store",
     "upi_id": "8180891464@kotakbank",
     "qr_image_url": "https://res.cloudinary.com/dvkyvryei/image/upload/v1792396336/WhatsApp_Image_2026-10-19_at_13.18.19_igyo43.jpg",
