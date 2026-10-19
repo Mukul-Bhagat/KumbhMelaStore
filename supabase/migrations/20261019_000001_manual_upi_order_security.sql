@@ -118,7 +118,16 @@ create index if not exists order_payment_submissions_order_created_idx
 insert into public.site_settings (setting_key, setting_value, is_public, sort_order)
 values (
   'payments.manual_upi',
-  '{"mode":"manual_upi","enabled":false}'::jsonb,
+  '{
+    "mode": "manual_upi",
+    "enabled": false,
+    "merchant_name": "Kumbh Mela Store",
+    "upi_id": "8180891464@kotakbank",
+    "qr_image_url": "https://res.cloudinary.com/dvkyvryei/image/upload/v1792396336/WhatsApp_Image_2026-10-19_at_13.18.19_igyo43.jpg",
+    "pending_payment_minutes": 30,
+    "instructions": "Pay the exact order amount using UPI. Your order will remain pending until our team verifies the payment.",
+    "support_contact": "8180891464"
+  }'::jsonb,
   false,
   100
 )
