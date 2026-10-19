@@ -101,6 +101,9 @@ export const routes = {
     get orders() {
       return localized('dashboard/orders')
     },
+    orderPayment(orderId = ':orderId') {
+      return localized(`dashboard/orders/${orderId}/payment`)
+    },
     get profile() {
       return localized('dashboard/profile')
     },

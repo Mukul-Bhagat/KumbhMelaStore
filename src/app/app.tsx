@@ -220,6 +220,10 @@ const router = createBrowserRouter([
                 lazy: () => import('@/pages/dashboard/orders/page'),
               },
               {
+                path: 'orders/:orderId/payment',
+                lazy: () => import('@/pages/dashboard/order-payment/page'),
+              },
+              {
                 path: 'profile',
                 lazy: () => import('@/pages/dashboard/profile/page'),
               },
