@@ -32,6 +32,26 @@ const fetchWithTimeout: typeof fetch = async (input, init) => {
 
   const response = await fetch(input, { ...init, signal })
   const requestUrl = input instanceof Request ? input.url : String(input)
+  const responseUrl = response.url || requestUrl
+
+  if (import.meta.env.DEV) {
+    try {
+      const url = new URL(responseUrl)
+      const rpcName = url.pathname.match(/\/rest\/v1\/rpc\/([^/]+)$/)?.[1]
+      if (rpcName === 'get_manual_upi_payment_config' || rpcName === 'get_manual_upi_checkout_quote') {
+        // Do not log headers, request bodies, or auth data. This is deliberately
+        // limited to the transport facts needed to diagnose checkout setup.
+        console.info('[checkout RPC transport]', {
+          rpcName,
+          status: response.status,
+          ok: response.ok,
+          project: url.host,
+        })
+      }
+    } catch {
+      // Diagnostics must never affect checkout requests.
+    }
+  }
 
   if (response.status === 429 && new URL(response.url || requestUrl).pathname.endsWith('/auth/v1/signup')) {
     signupRetryAfterSeconds = parseRetryAfter(response.headers.get('Retry-After'))

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Copy, Loader2, MapPinned, Phone, User } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -32,6 +32,9 @@ type ManualPaymentQuote = {
   currency: string
   payment: ManualPaymentConfig
 }
+
+type ConfigurationState = 'loading' | 'ready' | 'unavailable'
+type QuoteState = 'idle' | 'loading' | 'ready' | 'unavailable'
 
 type CheckoutRequest = {
   fingerprint: string | null
@@ -157,6 +160,40 @@ function checkoutErrorMessage(error: unknown) {
   return 'We could not create your order right now. Your cart is unchanged; please try again or contact support.'
 }
 
+function rpcErrorMessage(rpcName: string, error: unknown) {
+  const details = asRecord(error)
+  const code = typeof details?.code === 'string' ? details.code : ''
+  const message = typeof details?.message === 'string' ? details.message : ''
+
+  if (code === '42501' || /sign in|session|jwt|permission denied/i.test(message)) {
+    return 'Your session has expired. Sign in again and retry checkout.'
+  }
+  if (code === 'PGRST202' || /could not find.*function|function.*does not exist/i.test(message)) {
+    return rpcName === 'get_manual_upi_payment_config'
+      ? 'Manual UPI configuration is unavailable because the payment database migration is not active in this environment.'
+      : 'Checkout pricing is unavailable because the payment quote database migration is not active in this environment.'
+  }
+  if (/manual upi|configuration|enabled|upi/i.test(message)) {
+    return `Manual UPI configuration is unavailable: ${message}`
+  }
+  return rpcName === 'get_manual_upi_payment_config'
+    ? 'We could not load manual UPI configuration. Please retry; if this continues, contact support.'
+    : 'We could not calculate the current checkout total. Please retry; your cart has not changed.'
+}
+
+function logRpcDiagnostic(rpcName: string, outcome: 'success' | 'failure' | 'invalid_response', error?: unknown) {
+  if (!import.meta.env.DEV) return
+  const details = asRecord(error)
+  const status = typeof details?.status === 'number' ? details.status : null
+  const code = typeof details?.code === 'string' ? details.code : null
+  const message = typeof details?.message === 'string' ? details.message : null
+  const project = (() => {
+    try { return new URL(import.meta.env.VITE_SUPABASE_URL).host } catch { return 'invalid-url' }
+  })()
+  // Deliberately excludes credentials, addresses, cart content, and request bodies.
+  console.info('[checkout RPC]', { rpcName, outcome, status, code, message, project })
+}
+
 function supportHref(contact: string | null): string | null {
   const value = contact?.trim() ?? ''
   if (!value) return null
@@ -179,7 +216,10 @@ export function CheckoutForm() {
   const checkoutNowItem = useCartStore((state) => state.checkoutNowItem)
   const clearCart = useCartStore((state) => state.clear)
   const finishCheckoutNow = useCartStore((state) => state.finishCheckoutNow)
-  const items = checkoutNowItem ? [checkoutNowItem] : cartItems
+  const items = useMemo(
+    () => checkoutNowItem ? [checkoutNowItem] : cartItems,
+    [cartItems, checkoutNowItem],
+  )
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const currency = items[0]?.currency ?? 'INR'
   const unavailableItems = items.filter((item) =>
@@ -191,10 +231,14 @@ export function CheckoutForm() {
   const [message, setMessage] = useState<string | null>(null)
   const [request, setRequest] = useState<CheckoutRequest | null>(null)
   const [paymentConfig, setPaymentConfig] = useState<ManualPaymentConfig | null>(null)
-  const [paymentConfigLoading, setPaymentConfigLoading] = useState(true)
+  const [configurationState, setConfigurationState] = useState<ConfigurationState>('loading')
   const [paymentConfigError, setPaymentConfigError] = useState<string | null>(null)
   const [paymentConfigRetry, setPaymentConfigRetry] = useState(0)
   const [paymentQuote, setPaymentQuote] = useState<ManualPaymentQuote | null>(null)
+  const [quoteCartSignature, setQuoteCartSignature] = useState<string | null>(null)
+  const [quoteState, setQuoteState] = useState<QuoteState>('idle')
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [quoteRetry, setQuoteRetry] = useState(0)
   const [showPaymentStep, setShowPaymentStep] = useState(false)
   const [qrImageFailed, setQrImageFailed] = useState(false)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
@@ -206,6 +250,21 @@ export function CheckoutForm() {
     mode: 'onChange',
     reValidateMode: 'onChange',
   })
+  const cartIsReady = items.length > 0 && unavailableItems.length === 0
+  const formIsReady = form.formState.isValid
+  const cartRequestItems = useMemo(() => items.map((item) => ({
+    productId: item.productId,
+    variantId: item.variantId ?? null,
+    quantity: item.quantity,
+  })), [items])
+  const cartRequestSignature = JSON.stringify(cartRequestItems)
+  const hasAuthenticatedSession = Boolean(auth.user?.id)
+  const effectiveConfigurationState: ConfigurationState = hasAuthenticatedSession
+    ? configurationState
+    : 'unavailable'
+  const effectiveConfigurationError = hasAuthenticatedSession
+    ? paymentConfigError
+    : 'Your session has expired. Sign in again and retry checkout.'
 
   useEffect(() => {
     form.reset({
@@ -222,35 +281,96 @@ export function CheckoutForm() {
     }
 
     const loadPaymentConfig = async () => {
-      setPaymentConfigLoading(true)
+      setConfigurationState('loading')
       setPaymentConfigError(null)
       try {
         const { data, error } = await supabase.rpc('get_manual_upi_payment_config')
         if (!active) return
         if (error) {
+          logRpcDiagnostic('get_manual_upi_payment_config', 'failure', error)
           setPaymentConfig(null)
-          setPaymentConfigError('Manual UPI payment is currently unavailable. Please contact support.')
+          setConfigurationState('unavailable')
+          setPaymentConfigError(rpcErrorMessage('get_manual_upi_payment_config', error))
           return
         }
 
         const config = readManualPaymentConfig(data)
         setPaymentConfig(config)
         setQrImageFailed(false)
-        setPaymentConfigError(config
-          ? null
-          : 'Manual UPI payment is not enabled by the store right now. Please contact support before trying again.')
-      } catch {
+        if (config) {
+          logRpcDiagnostic('get_manual_upi_payment_config', 'success')
+          setConfigurationState('ready')
+          setPaymentConfigError(null)
+        } else {
+          const reason = asRecord(data)?.reason
+          logRpcDiagnostic('get_manual_upi_payment_config', 'invalid_response')
+          setConfigurationState('unavailable')
+          setPaymentConfigError(reason === 'disabled'
+            ? 'Manual UPI payment is currently disabled by the store.'
+            : reason === 'invalid_configuration'
+              ? 'Manual UPI payment configuration is incomplete or invalid. Please contact support.'
+              : 'Manual UPI payment configuration is unavailable. Please contact support.')
+        }
+      } catch (error) {
         if (!active) return
+        logRpcDiagnostic('get_manual_upi_payment_config', 'failure', error)
         setPaymentConfig(null)
-        setPaymentConfigError('We could not check payment availability. Check your connection and try again.')
-      } finally {
-        if (active) setPaymentConfigLoading(false)
+        setConfigurationState('unavailable')
+        setPaymentConfigError('We could not load manual UPI configuration. Check your connection and retry.')
       }
     }
 
     void loadPaymentConfig()
     return () => { active = false }
   }, [auth.user?.id, paymentConfigRetry, supabase])
+
+  useEffect(() => {
+    let active = true
+    if (!auth.user?.id || configurationState !== 'ready' || !paymentConfig || !cartIsReady || !formIsReady) {
+      return () => { active = false }
+    }
+
+    const loadQuote = async () => {
+      setQuoteState('loading')
+      setQuoteError(null)
+      try {
+        const { data, error } = await supabase.rpc('get_manual_upi_checkout_quote', {
+          p_cart_items: cartRequestItems,
+        })
+        if (!active) return
+        if (error) {
+          logRpcDiagnostic('get_manual_upi_checkout_quote', 'failure', error)
+          setPaymentQuote(null)
+          setQuoteState('unavailable')
+          setQuoteError(rpcErrorMessage('get_manual_upi_checkout_quote', error))
+          return
+        }
+
+        const quote = readManualPaymentQuote(data)
+        if (!quote) {
+          logRpcDiagnostic('get_manual_upi_checkout_quote', 'invalid_response')
+          setPaymentQuote(null)
+          setQuoteState('unavailable')
+          setQuoteError('The checkout quote returned an invalid amount or payment configuration. Please retry.')
+          return
+        }
+
+        logRpcDiagnostic('get_manual_upi_checkout_quote', 'success')
+        setPaymentQuote(quote)
+        setQuoteCartSignature(cartRequestSignature)
+        setQuoteState('ready')
+      } catch (error) {
+        if (!active) return
+        logRpcDiagnostic('get_manual_upi_checkout_quote', 'failure', error)
+        setPaymentQuote(null)
+        setQuoteState('unavailable')
+        setQuoteError(rpcErrorMessage('get_manual_upi_checkout_quote', error))
+      }
+    }
+
+    void loadQuote()
+    return () => { active = false }
+  }, [auth.user?.id, cartIsReady, cartRequestItems, cartRequestSignature, configurationState, formIsReady, paymentConfig, quoteRetry, supabase])
 
   const onSubmit = form.handleSubmit(async (values) => {
     setMessage(null)
@@ -267,6 +387,9 @@ export function CheckoutForm() {
       }
       if (!paymentConfig) {
         throw new Error('Manual UPI payment is not enabled by the store right now. Please contact support.')
+      }
+      if (!paymentQuote || quoteCartSignature !== cartRequestSignature) {
+        throw new Error('The checkout total is no longer current. Recalculate it before placing your order.')
       }
       const reference = paymentReference.trim()
       if (reference && (reference.length < 4 || reference.length > 128)) {
@@ -339,32 +462,10 @@ export function CheckoutForm() {
     }
   })
 
-  const reviewPayment = form.handleSubmit(async () => {
+  const reviewPayment = form.handleSubmit(() => {
     setMessage(null)
     setCopyMessage(null)
-    setPaymentQuote(null)
-    try {
-      if (!auth.user) throw new Error('You must be signed in to check the payment total.')
-      if (items.length === 0 || unavailableItems.length > 0) {
-        throw new Error('Review your cart before checking the payment total.')
-      }
-      const { data, error } = await supabase.rpc('get_manual_upi_checkout_quote', {
-        p_cart_items: items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId ?? null,
-          quantity: item.quantity,
-        })),
-      })
-      if (error) throw error
-
-      const quote = readManualPaymentQuote(data)
-      if (!quote) throw new Error('The server returned an invalid payment quote. Please try again.')
-      setPaymentConfig(quote.payment)
-      setPaymentQuote(quote)
-      setShowPaymentStep(true)
-    } catch (error) {
-      setMessage(checkoutErrorMessage(error))
-    }
+    if (quoteState === 'ready' && paymentQuote && quoteCartSignature === cartRequestSignature) setShowPaymentStep(true)
   })
 
   const copyUpiId = async () => {
@@ -377,17 +478,38 @@ export function CheckoutForm() {
     }
   }
 
-  const cartIsReady = items.length > 0 && unavailableItems.length === 0
-  const formIsReady = form.formState.isValid
-  const isSubmitDisabled = form.formState.isSubmitting || !formIsReady || !cartIsReady || paymentConfigLoading || !paymentConfig || (showPaymentStep && !paymentQuote)
-  const checkoutBlocker = paymentConfigLoading
+  const retryConfiguration = () => {
+    setPaymentQuote(null)
+    setQuoteCartSignature(null)
+    setQuoteError(null)
+    setQuoteState('idle')
+    setShowPaymentStep(false)
+    setPaymentConfigRetry((value) => value + 1)
+  }
+  const retryQuote = () => {
+    setPaymentQuote(null)
+    setQuoteCartSignature(null)
+    setQuoteError(null)
+    setQuoteState('idle')
+    setShowPaymentStep(false)
+    setQuoteRetry((value) => value + 1)
+  }
+  const isQuoteCurrent = quoteCartSignature === cartRequestSignature
+  const isSubmitDisabled = form.formState.isSubmitting || !formIsReady || !cartIsReady || effectiveConfigurationState !== 'ready' || quoteState !== 'ready' || !isQuoteCurrent || !paymentConfig || !paymentQuote
+  const checkoutBlocker = effectiveConfigurationState === 'loading'
     ? 'Checking approved UPI payment availability…'
-    : paymentConfigError
-      ? paymentConfigError
+    : effectiveConfigurationError
+      ? effectiveConfigurationError
       : !cartIsReady
         ? 'Review your cart before creating an order.'
         : !formIsReady
           ? 'Complete the required delivery details to create your order.'
+          : quoteState === 'loading'
+            ? 'Calculating the current server-validated total…'
+            : quoteError
+              ? quoteError
+              : quoteState === 'idle'
+                ? 'Preparing the server-validated total…'
           : null
 
   return (
@@ -397,17 +519,30 @@ export function CheckoutForm() {
         description={`Your order will be created for ${auth.user?.email ?? 'your account'} and will remain pending until manual UPI payment is verified.`}
       />
 
-      {paymentConfigLoading ? (
+      {effectiveConfigurationState === 'loading' ? (
         <Alert title="Checking payment availability" description="Loading the approved payment destination…" />
-      ) : paymentConfigError ? (
+      ) : effectiveConfigurationError ? (
         <Alert
           title="Payment currently unavailable"
           description={
             <div className="space-y-3">
-              <p>{paymentConfigError}</p>
-              <Button type="button" size="sm" variant="outline" onClick={() => setPaymentConfigRetry((value) => value + 1)}>
+              <p>{effectiveConfigurationError}</p>
+              <Button type="button" size="sm" variant="outline" onClick={retryConfiguration}>
                 Check again
               </Button>
+            </div>
+          }
+          variant="error"
+        />
+      ) : null}
+
+      {quoteError ? (
+        <Alert
+          title="Checkout total unavailable"
+          description={
+            <div className="space-y-3">
+              <p>{quoteError}</p>
+              <Button type="button" size="sm" variant="outline" onClick={retryQuote}>Recalculate total</Button>
             </div>
           }
           variant="error"
