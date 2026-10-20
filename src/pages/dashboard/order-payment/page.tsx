@@ -139,6 +139,16 @@ function paymentStatusVariant(status: string) {
   return 'muted' as const
 }
 
+function supportHref(contact: string | null): string | null {
+  const value = contact?.trim() ?? ''
+  if (!value) return null
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`
+  if (/^https?:\/\//i.test(value)) return value
+
+  const phone = value.replace(/[\s()-]/g, '')
+  return /^\+?[0-9]{7,15}$/.test(phone) ? `tel:${phone}` : null
+}
+
 export function Component() {
   const { orderId = '' } = useParams()
   const auth = useAuth()
@@ -147,6 +157,7 @@ export function Component() {
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null)
   const [submittingReference, setSubmittingReference] = useState(false)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
+  const [qrImageFailed, setQrImageFailed] = useState(false)
   const query = useQuery({
     queryKey: ['order-payment', auth.user?.id, orderId],
     queryFn: () => loadOrderPayment(orderId, auth.user!.id),
@@ -197,6 +208,7 @@ export function Component() {
 
   const { order, items, payment } = query.data
   const orderLocale = locale === 'hi' ? 'hi-IN' : 'en-IN'
+  const contactUrl = supportHref(payment.payment?.supportContact ?? null)
 
   return (
     <div className="space-y-8">
@@ -251,7 +263,17 @@ export function Component() {
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Manual UPI payment</p>
                 <p className="mt-2 font-display text-3xl font-semibold">{formatCurrency(payment.amount, payment.currency, orderLocale)}</p>
               </div>
-              <img src={payment.payment.qrImageUrl} alt={`Approved UPI QR code for ${payment.payment.merchantName}`} className="mx-auto h-48 w-48 rounded-[var(--radius-field)] border border-border bg-white object-contain p-2" referrerPolicy="no-referrer" />
+              {qrImageFailed ? (
+                <Alert title="QR image unavailable" description="Use the approved UPI ID below or contact the store before paying. Do not use a different payment destination." variant="error" />
+              ) : (
+                <img
+                  src={payment.payment.qrImageUrl}
+                  alt={`Approved UPI QR code for ${payment.payment.merchantName}`}
+                  className="mx-auto h-48 w-48 rounded-[var(--radius-field)] border border-border bg-white object-contain p-2"
+                  referrerPolicy="no-referrer"
+                  onError={() => setQrImageFailed(true)}
+                />
+              )}
               <p className="text-sm leading-6 text-muted-foreground">{payment.payment.instructions}</p>
               <div className="rounded-[var(--radius-field)] border border-border bg-background p-4 text-sm">
                 <p className="text-muted-foreground">Pay to</p>
@@ -262,7 +284,12 @@ export function Component() {
                 </Button>
                 {copyMessage ? <p className="mt-2 text-xs text-muted-foreground" role="status">{copyMessage}</p> : null}
               </div>
-              {payment.payment.supportContact ? <p className="text-sm text-muted-foreground">Support: {payment.payment.supportContact}</p> : null}
+              {payment.payment.supportContact ? (
+                <div className="text-sm text-muted-foreground">
+                  <p>Support: {payment.payment.supportContact}</p>
+                  {contactUrl ? <Button asChild type="button" size="sm" variant="outline" className="mt-2"><a href={contactUrl}>Contact us</a></Button> : null}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : (

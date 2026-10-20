@@ -666,6 +666,10 @@ export interface Database {
         Args: Record<string, never>
         Returns: Json
       }
+      get_manual_upi_checkout_quote: {
+        Args: { p_cart_items: Json }
+        Returns: Json
+      }
       get_order_manual_payment_details: {
         Args: { p_order_id: string }
         Returns: Json

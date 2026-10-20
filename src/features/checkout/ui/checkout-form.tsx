@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, MapPinned, Phone, User } from 'lucide-react'
+import { Copy, Loader2, MapPinned, Phone, User } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -8,7 +8,6 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
 import {
   checkoutSchema,
   type CheckoutValues,
@@ -28,6 +27,12 @@ type ManualPaymentConfig = {
   supportContact: string | null
 }
 
+type ManualPaymentQuote = {
+  amount: number
+  currency: string
+  payment: ManualPaymentConfig
+}
+
 type CheckoutRequest = {
   fingerprint: string | null
   id: string
@@ -36,7 +41,6 @@ type CheckoutRequest = {
 const checkoutRequestStorageKey = 'kumbh-melastore-checkout-request-v1'
 
 const defaultValues: CheckoutValues = {
-  label: 'Home',
   recipientName: '',
   phone: '',
   addressLine1: '',
@@ -44,8 +48,6 @@ const defaultValues: CheckoutValues = {
   city: '',
   state: '',
   postalCode: '',
-  countryCode: 'IN',
-  landmark: '',
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -64,6 +66,18 @@ function readManualPaymentConfig(value: unknown): ManualPaymentConfig | null {
     typeof config.instructions !== 'string'
   ) return null
 
+  let qrUrl: URL
+  try {
+    qrUrl = new URL(config.qrImageUrl)
+  } catch {
+    return null
+  }
+  if (
+    !config.merchantName.trim() ||
+    !/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9._-]{2,64}$/.test(config.upiId) ||
+    qrUrl.protocol !== 'https:'
+  ) return null
+
   return {
     available: true,
     merchantName: config.merchantName,
@@ -72,6 +86,21 @@ function readManualPaymentConfig(value: unknown): ManualPaymentConfig | null {
     instructions: config.instructions,
     supportContact: typeof config.supportContact === 'string' ? config.supportContact : null,
   }
+}
+
+function readManualPaymentQuote(value: unknown): ManualPaymentQuote | null {
+  const quote = asRecord(value)
+  const payment = readManualPaymentConfig(quote?.payment)
+  if (
+    typeof quote?.amount !== 'number' ||
+    !Number.isFinite(quote.amount) ||
+    quote.amount <= 0 ||
+    typeof quote.currency !== 'string' ||
+    quote.currency !== 'INR' ||
+    !payment
+  ) return null
+
+  return { amount: quote.amount, currency: quote.currency, payment }
 }
 
 function isUuid(value: unknown): value is string {
@@ -122,10 +151,20 @@ function checkoutErrorMessage(error: unknown) {
   if (/sign in|session|jwt/i.test(message)) {
     return 'Your session has expired. Sign in again before placing your order.'
   }
-  if (/cart|product|stock|currency|delivery address|checkout request|manual upi|too many checkout/i.test(message)) {
+  if (/cart|product|stock|currency|delivery address|checkout request|manual upi|too many checkout|transaction reference/i.test(message)) {
     return message
   }
   return 'We could not create your order right now. Your cart is unchanged; please try again or contact support.'
+}
+
+function supportHref(contact: string | null): string | null {
+  const value = contact?.trim() ?? ''
+  if (!value) return null
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`
+  if (/^https?:\/\//i.test(value)) return value
+
+  const phone = value.replace(/[\s()-]/g, '')
+  return /^\+?[0-9]{7,15}$/.test(phone) ? `tel:${phone}` : null
 }
 
 function FieldError({ message }: { message: string | undefined }) {
@@ -155,6 +194,11 @@ export function CheckoutForm() {
   const [paymentConfigLoading, setPaymentConfigLoading] = useState(true)
   const [paymentConfigError, setPaymentConfigError] = useState<string | null>(null)
   const [paymentConfigRetry, setPaymentConfigRetry] = useState(0)
+  const [paymentQuote, setPaymentQuote] = useState<ManualPaymentQuote | null>(null)
+  const [showPaymentStep, setShowPaymentStep] = useState(false)
+  const [qrImageFailed, setQrImageFailed] = useState(false)
+  const [copyMessage, setCopyMessage] = useState<string | null>(null)
+  const [paymentReference, setPaymentReference] = useState('')
 
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
@@ -173,10 +217,7 @@ export function CheckoutForm() {
 
   useEffect(() => {
     let active = true
-    if (!auth.user) {
-      setPaymentConfig(null)
-      setPaymentConfigLoading(false)
-      setPaymentConfigError('Sign in to check payment availability.')
+    if (!auth.user?.id) {
       return () => { active = false }
     }
 
@@ -194,6 +235,7 @@ export function CheckoutForm() {
 
         const config = readManualPaymentConfig(data)
         setPaymentConfig(config)
+        setQrImageFailed(false)
         setPaymentConfigError(config
           ? null
           : 'Manual UPI payment is not enabled by the store right now. Please contact support before trying again.')
@@ -226,6 +268,10 @@ export function CheckoutForm() {
       if (!paymentConfig) {
         throw new Error('Manual UPI payment is not enabled by the store right now. Please contact support.')
       }
+      const reference = paymentReference.trim()
+      if (reference && (reference.length < 4 || reference.length > 128)) {
+        throw new Error('Enter a valid UPI transaction reference or leave it blank.')
+      }
 
       const authoritativeCartItems = items.map((item) => ({
         productId: item.productId,
@@ -233,16 +279,17 @@ export function CheckoutForm() {
         quantity: item.quantity,
       }))
       const shippingAddress = {
-        label: values.label.trim(),
+        // These fields remain server-side defaults for the existing saved-address schema.
+        // Customers are deliberately not asked to choose a label or country at checkout.
+        label: 'Delivery address',
         recipientName: values.recipientName.trim(),
         phone: values.phone.trim(),
         addressLine1: values.addressLine1.trim(),
-        addressLine2: values.addressLine2?.trim() ?? '',
+        addressLine2: values.addressLine2.trim(),
         city: values.city.trim(),
         state: values.state.trim(),
         postalCode: values.postalCode.trim(),
         countryCode: 'IN',
-        landmark: values.landmark?.trim() ?? '',
       }
       const fingerprint = await fingerprintCheckoutRequest({
         cartItems: authoritativeCartItems,
@@ -268,6 +315,17 @@ export function CheckoutForm() {
         throw new Error('Supabase did not return the order confirmation.')
       }
 
+      // A UTR is only unverified customer evidence. The database RPC deliberately
+      // cannot change payment_status, even when the reference is accepted.
+      if (reference) {
+        const { error: referenceError } = await supabase.rpc('submit_manual_upi_reference', {
+          p_order_id: order.order_id,
+          p_transaction_reference: reference,
+          p_note: null,
+        })
+        if (referenceError) throw referenceError
+      }
+
       if (checkoutNowItem) {
         finishCheckoutNow()
       } else {
@@ -281,9 +339,47 @@ export function CheckoutForm() {
     }
   })
 
+  const reviewPayment = form.handleSubmit(async () => {
+    setMessage(null)
+    setCopyMessage(null)
+    setPaymentQuote(null)
+    try {
+      if (!auth.user) throw new Error('You must be signed in to check the payment total.')
+      if (items.length === 0 || unavailableItems.length > 0) {
+        throw new Error('Review your cart before checking the payment total.')
+      }
+      const { data, error } = await supabase.rpc('get_manual_upi_checkout_quote', {
+        p_cart_items: items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: item.quantity,
+        })),
+      })
+      if (error) throw error
+
+      const quote = readManualPaymentQuote(data)
+      if (!quote) throw new Error('The server returned an invalid payment quote. Please try again.')
+      setPaymentConfig(quote.payment)
+      setPaymentQuote(quote)
+      setShowPaymentStep(true)
+    } catch (error) {
+      setMessage(checkoutErrorMessage(error))
+    }
+  })
+
+  const copyUpiId = async () => {
+    if (!paymentConfig) return
+    try {
+      await navigator.clipboard.writeText(paymentConfig.upiId)
+      setCopyMessage('UPI ID copied.')
+    } catch {
+      setCopyMessage('Copy is unavailable in this browser. Select the UPI ID to copy it manually.')
+    }
+  }
+
   const cartIsReady = items.length > 0 && unavailableItems.length === 0
   const formIsReady = form.formState.isValid
-  const isSubmitDisabled = form.formState.isSubmitting || !formIsReady || !cartIsReady || paymentConfigLoading || !paymentConfig
+  const isSubmitDisabled = form.formState.isSubmitting || !formIsReady || !cartIsReady || paymentConfigLoading || !paymentConfig || (showPaymentStep && !paymentQuote)
   const checkoutBlocker = paymentConfigLoading
     ? 'Checking approved UPI payment availability…'
     : paymentConfigError
@@ -295,7 +391,7 @@ export function CheckoutForm() {
           : null
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6" noValidate>
+    <form onSubmit={showPaymentStep ? onSubmit : reviewPayment} className="space-y-6" noValidate>
       <Alert
         title="Authenticated account"
         description={`Your order will be created for ${auth.user?.email ?? 'your account'} and will remain pending until manual UPI payment is verified.`}
@@ -361,21 +457,6 @@ export function CheckoutForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="checkout-label">Address label</Label>
-          <Input id="checkout-label" autoComplete="shipping address-level3" {...form.register('label')} />
-          <FieldError message={form.formState.errors.label?.message} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="checkout-country">Country</Label>
-          <Select id="checkout-country" {...form.register('countryCode')}>
-            <option value="IN">India</option>
-          </Select>
-          <FieldError message={form.formState.errors.countryCode?.message} />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
           <Label htmlFor="checkout-name">Recipient name</Label>
           <div className="relative">
             <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -403,14 +484,8 @@ export function CheckoutForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="checkout-landmark">Landmark <span className="font-normal text-muted-foreground">(optional)</span></Label>
-        <Input id="checkout-landmark" placeholder="Near the temple entrance" {...form.register('landmark')} />
-        <FieldError message={form.formState.errors.landmark?.message} />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="checkout-address-2">Address line 2 <span className="font-normal text-muted-foreground">(optional)</span></Label>
-        <Input id="checkout-address-2" autoComplete="shipping address-line2" placeholder="Locality, building, or flat number" {...form.register('addressLine2')} />
+        <Label htmlFor="checkout-address-2">Address line 2</Label>
+        <Input id="checkout-address-2" autoComplete="shipping address-line2" placeholder="Locality, building, floor, or flat number" {...form.register('addressLine2')} />
         <FieldError message={form.formState.errors.addressLine2?.message} />
       </div>
 
@@ -433,14 +508,77 @@ export function CheckoutForm() {
       </div>
 
       <div className="space-y-2">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitDisabled}>
-            {form.formState.isSubmitting ? (
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Creating order</span>
-            ) : 'Create order & view UPI instructions'}
-          </Button>
-          <Button asChild variant="outline"><Link to={routes.cart}>Review cart</Link></Button>
-        </div>
+        {showPaymentStep && paymentConfig && paymentQuote ? (
+          <section className="space-y-4 rounded-[var(--radius-card)] border border-primary/30 bg-primary/5 p-4 sm:p-6" aria-labelledby="manual-upi-payment-heading">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Payment step</p>
+                <h2 id="manual-upi-payment-heading" className="mt-1 font-display text-2xl font-semibold">Pay by manual UPI</h2>
+              </div>
+              <p className="font-display text-xl font-semibold">{formatCurrency(paymentQuote.amount, paymentQuote.currency)}</p>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              This exact INR total was calculated by Supabase from the current catalog. It is checked again before the pending order is created; the confirmation page shows the final authoritative total.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
+              <div className="rounded-[var(--radius-field)] border border-border bg-background p-2">
+                {qrImageFailed ? (
+                  <p className="p-4 text-sm text-error" role="alert">The approved QR image could not be loaded. Use the UPI ID below or contact us before paying.</p>
+                ) : (
+                  <img
+                    src={paymentConfig.qrImageUrl}
+                    alt={`Approved UPI QR code for ${paymentConfig.merchantName}`}
+                    className="mx-auto aspect-square w-full object-contain"
+                    referrerPolicy="no-referrer"
+                    onError={() => setQrImageFailed(true)}
+                  />
+                )}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Merchant</p>
+                  <p className="font-semibold">{paymentConfig.merchantName}</p>
+                </div>
+                <div className="rounded-[var(--radius-field)] border border-border bg-background p-3">
+                  <p className="text-sm text-muted-foreground">UPI ID</p>
+                  <p className="mt-1 break-all font-mono text-base text-primary">{paymentConfig.upiId}</p>
+                  <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void copyUpiId()}>
+                    <Copy className="h-4 w-4" />Copy UPI ID
+                  </Button>
+                  {copyMessage ? <p className="mt-2 text-xs text-muted-foreground" role="status">{copyMessage}</p> : null}
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">{paymentConfig.instructions}</p>
+                <div className="space-y-2">
+                  <Label htmlFor="checkout-payment-reference">Transaction reference / UTR <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    id="checkout-payment-reference"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                    placeholder="UPI transaction ID / UTR"
+                    maxLength={128}
+                  />
+                  <p className="text-xs text-muted-foreground">If provided, it is saved only as unverified evidence for the store to review.</p>
+                </div>
+              </div>
+            </div>
+            <Alert title="Payment is not verified yet" description="Selecting “I've paid” only creates a pending order. It never marks payment as paid; the store must verify the actual UPI receipt." variant="warning" />
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitDisabled}>
+                {form.formState.isSubmitting ? (
+                  <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Creating pending order</span>
+                ) : "I've paid — create pending order"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowPaymentStep(false)}>Edit delivery details</Button>
+              <Button asChild type="button" variant="outline"><Link to={routes.cart}>Not paid — return to cart</Link></Button>
+              {supportHref(paymentConfig.supportContact) ? <Button asChild type="button" variant="outline"><a href={supportHref(paymentConfig.supportContact) ?? undefined}>Contact us</a></Button> : null}
+            </div>
+          </section>
+        ) : (
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitDisabled}>Review UPI payment</Button>
+            <Button asChild variant="outline"><Link to={routes.cart}>Review cart</Link></Button>
+          </div>
+        )}
         {checkoutBlocker ? <p className="text-sm text-muted-foreground" role="status">{checkoutBlocker}</p> : null}
       </div>
     </form>
