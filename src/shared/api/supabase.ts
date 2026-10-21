@@ -24,14 +24,39 @@ function parseRetryAfter(value: string | null) {
     : Math.max(0, Math.ceil((retryAt - Date.now()) / 1000))
 }
 
+function requestUrlFor(input: RequestInfo | URL) {
+  return input instanceof Request ? input.url : String(input)
+}
+
+function headersWithSupabaseApiKey(input: RequestInfo | URL, init: RequestInit | undefined, requestUrl: string) {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined)
+
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, name) => headers.set(name, value))
+  }
+
+  // Supabase clients normally add this header themselves. Set it at the
+  // transport boundary as well so the browser request cannot lose the public
+  // project key when a Request and RequestInit are merged by a custom fetch.
+  // This fetch implementation is used only by this project's Supabase client;
+  // the origin check additionally prevents the public key being sent elsewhere.
+  const env = getPublicEnv()
+  if (new URL(requestUrl).origin === new URL(env.VITE_SUPABASE_URL).origin) {
+    headers.set('apikey', getSupabasePublishableKey(env))
+  }
+
+  return headers
+}
+
 const fetchWithTimeout: typeof fetch = async (input, init) => {
   const timeoutSignal = AbortSignal.timeout(15_000)
   const signal = init?.signal
     ? AbortSignal.any([init.signal, timeoutSignal])
     : timeoutSignal
+  const requestUrl = requestUrlFor(input)
+  const headers = headersWithSupabaseApiKey(input, init, requestUrl)
 
-  const response = await fetch(input, { ...init, signal })
-  const requestUrl = input instanceof Request ? input.url : String(input)
+  const response = await fetch(input, { ...init, headers, signal })
   const responseUrl = response.url || requestUrl
 
   if (import.meta.env.DEV) {
