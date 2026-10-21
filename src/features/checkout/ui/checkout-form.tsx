@@ -77,7 +77,7 @@ function readManualPaymentConfig(value: unknown): ManualPaymentConfig | null {
   }
   if (
     !config.merchantName.trim() ||
-    !/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9._-]{2,64}$/.test(config.upiId) ||
+    !/^[A-Za-z0-9._-]{2,255}@[A-Za-z0-9._-]{2,64}$/.test(config.upiId) ||
     qrUrl.protocol !== 'https:'
   ) return null
 
